@@ -1,5 +1,7 @@
 # Eleanor Media Server
 
+Media Library Server - Electronic Library for Entertainment, Audio, and ORganization
+
 Eleanor Media Server is a media server application for managing and serving media files on your local server.
 
 ## Features
