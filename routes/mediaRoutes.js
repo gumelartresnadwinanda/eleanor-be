@@ -70,6 +70,8 @@ router.post("/batch", checkToken, async (req, res) => {
     return res.status(400).json({ error: "Invalid data format" });
   }
 
+  const failedInserts = [];
+
   try {
     await db.transaction(async (trx) => {
       for (const media of mediaData) {
@@ -87,21 +89,23 @@ router.post("/batch", checkToken, async (req, res) => {
         try {
           await trx("media").insert(mediaEntry);
         } catch (error) {
-          if (error.code === "23505") {
-            console.log(`Media file already exists: ${media.file_path}`);
-          } else {
-            throw error;
-          }
+          failedInserts.push({
+            file_path: media.file_path,
+            reason: error.message,
+          });
+          console.error(
+            `Failed to insert media file: ${media.file_path}`,
+            error
+          );
         }
       }
     });
 
-    res
-      .status(201)
-      .json({
-        message: "Batch media data inserted successfully",
-        data: mediaData,
-      });
+    res.status(201).json({
+      message: "Batch media data inserted successfully",
+      data: mediaData,
+      failedInserts,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to insert batch media data" });
   }
@@ -119,6 +123,8 @@ router.put("/batch", checkToken, async (req, res) => {
     return res.status(400).json({ error: "Invalid data format" });
   }
 
+  const failedUpdates = [];
+
   try {
     await db.transaction(async (trx) => {
       for (const media of mediaData) {
@@ -134,21 +140,17 @@ router.put("/batch", checkToken, async (req, res) => {
         try {
           await trx("media").where({ id: media.id }).update(mediaEntry);
         } catch (error) {
-          if (error.code === "23505") {
-            console.log(`Media file already exists: ${media.file_path}`);
-          } else {
-            throw error;
-          }
+          failedUpdates.push({ id: media.id, reason: error.message });
+          console.error(`Failed to update media ID: ${media.id}`, error);
         }
       }
     });
 
-    res
-      .status(200)
-      .json({
-        message: "Batch media data updated successfully",
-        data: mediaData,
-      });
+    res.status(200).json({
+      message: "Batch media data updated successfully",
+      data: mediaData,
+      failedUpdates,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to update batch media data" });
   }
@@ -166,12 +168,18 @@ router.delete("/batch", checkToken, async (req, res) => {
     return res.status(400).json({ error: "Invalid data format" });
   }
 
+  const failedDeletes = [];
+
   try {
     await db.transaction(async (trx) => {
       for (const media of mediaData) {
         try {
           await trx("media").where({ file_path: media.file_path }).del();
         } catch (error) {
+          failedDeletes.push({
+            file_path: media.file_path,
+            reason: error.message,
+          });
           console.error(
             `Failed to delete media file: ${media.file_path}`,
             error
@@ -180,12 +188,11 @@ router.delete("/batch", checkToken, async (req, res) => {
       }
     });
 
-    res
-      .status(200)
-      .json({
-        message: "Batch media data deleted successfully",
-        data: mediaData,
-      });
+    res.status(200).json({
+      message: "Batch media data deleted successfully",
+      data: mediaData,
+      failedDeletes,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to delete batch media data" });
   }
@@ -202,6 +209,8 @@ router.put("/batch/tags", checkToken, async (req, res) => {
   if (!Array.isArray(ids) || typeof tags !== "string") {
     return res.status(400).json({ error: "Invalid data format" });
   }
+
+  const failedUpdates = [];
 
   try {
     await db.transaction(async (trx) => {
@@ -221,14 +230,17 @@ router.put("/batch/tags", checkToken, async (req, res) => {
             }
           }
         } catch (error) {
+          failedUpdates.push({ id, reason: error.message });
           console.error(`Failed to update tags for media ID: ${id}`, error);
         }
       }
     });
 
-    res
-      .status(200)
-      .json({ message: "Batch tags updated successfully", data: ids });
+    res.status(200).json({
+      message: "Batch tags updated successfully",
+      data: ids,
+      failedUpdates,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to update batch tags" });
   }
@@ -246,6 +258,8 @@ router.delete("/batch/tags", checkToken, async (req, res) => {
     return res.status(400).json({ error: "Invalid data format" });
   }
 
+  const failedDeletes = [];
+
   try {
     await db.transaction(async (trx) => {
       for (const id of ids) {
@@ -261,16 +275,58 @@ router.delete("/batch/tags", checkToken, async (req, res) => {
             await trx("media").where({ id }).update({ tags: updatedTags });
           }
         } catch (error) {
+          failedDeletes.push({ id, reason: error.message });
           console.error(`Failed to remove tags for media ID: ${id}`, error);
         }
       }
     });
 
-    res
-      .status(200)
-      .json({ message: "Batch tags removed successfully", data: ids });
+    res.status(200).json({
+      message: "Batch tags removed successfully",
+      data: ids,
+      failedDeletes,
+    });
   } catch (err) {
     res.status(500).json({ error: "Failed to remove batch tags" });
+  }
+});
+
+// PUT route to update protection status for a batch of media entries
+router.put("/batch/protected", checkToken, async (req, res) => {
+  if (!req.isAuthenticated) {
+    return res.status(403).json({ error: "Unauthorized" });
+  }
+
+  const { ids, is_protected } = req.body;
+
+  if (!Array.isArray(ids) || typeof is_protected !== "boolean") {
+    return res.status(400).json({ error: "Invalid data format" });
+  }
+
+  const failedUpdates = [];
+
+  try {
+    await db.transaction(async (trx) => {
+      for (const id of ids) {
+        try {
+          await trx("media").where({ id }).update({ is_protected });
+        } catch (error) {
+          failedUpdates.push({ id, reason: error.message });
+          console.error(
+            `Failed to update protection status for media ID: ${id}`,
+            error
+          );
+        }
+      }
+    });
+
+    res.status(200).json({
+      message: "Batch protection status updated successfully",
+      data: ids,
+      failedUpdates,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to update batch protection status" });
   }
 });
 

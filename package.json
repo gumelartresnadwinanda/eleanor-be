@@ -6,6 +6,7 @@
   "author": "Nanda <58926775+gumelartresnadwinanda@users.noreply.github.com>",
   "license": "MIT",
   "dependencies": {
+    "body-parser": "^1.20.3",
     "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
     "exif-reader": "^2.0.4",
