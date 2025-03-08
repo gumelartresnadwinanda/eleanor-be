@@ -41,6 +41,7 @@ router.get("/", checkToken, async (req, res) => {
     }
 
     // Apply randomization or pagination
+    const countQuery = query.clone();
     if (is_random === "true") {
       query = query.orderByRaw("RANDOM()");
     } else {
@@ -49,7 +50,7 @@ router.get("/", checkToken, async (req, res) => {
 
     // Execute the query and send the response
     const medias = await query;
-    const count = await db("media").count().first();
+    const count = await countQuery.count().first();
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
     res.json({ data: medias, next, prev, count: count.count });

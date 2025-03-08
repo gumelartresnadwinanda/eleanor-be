@@ -39,6 +39,7 @@ router.get("/", checkToken, async (req, res) => {
       }
     }
 
+    const countQuery = query.clone();
     // Apply randomization or pagination
     if (is_random === "true") {
       query = query.orderByRaw("RANDOM()");
@@ -48,7 +49,7 @@ router.get("/", checkToken, async (req, res) => {
 
     // Execute the query and send the response
     const playlists = await query;
-    const count = await db("playlists").count().first();
+    const count = await countQuery.count().first();
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
     res.json({ data: playlists, next, prev, count: count.count });
