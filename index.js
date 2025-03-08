@@ -1,15 +1,19 @@
 const express = require("express");
-const knex = require("knex");
-const config = require("./knexfile");
+const cookieParser = require("cookie-parser");
+const authMiddleware = require("./middleware/authMiddleware");
 
 const app = express();
-const db = knex(config.development);
 
 app.use(express.json());
+app.use(cookieParser());
+app.use(authMiddleware);
 
 app.get("/", (req, res) => {
   res.send("Media Server is running!");
 });
+
+const mediaRoutes = require("./routes/mediaRoutes");
+app.use("/medias", mediaRoutes);
 
 const PORT = process.env.PORT || 5435;
 app.listen(PORT, () => {

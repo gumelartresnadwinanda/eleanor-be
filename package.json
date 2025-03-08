@@ -6,12 +6,14 @@
   "author": "Nanda <58926775+gumelartresnadwinanda@users.noreply.github.com>",
   "license": "MIT",
   "dependencies": {
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.7",
+    "exif-reader": "^2.0.4",
     "express": "^4.21.2",
+    "fluent-ffmpeg": "^2.1.2",
+    "jsonwebtoken": "^9.0.2",
     "knex": "^3.1.0",
     "pg": "^8.13.3",
-    "fluent-ffmpeg": "^2.1.2",
-    "exif-reader": "^2.0.4",
     "sharp": "^0.31.3"
   },
   "devDependencies": {
