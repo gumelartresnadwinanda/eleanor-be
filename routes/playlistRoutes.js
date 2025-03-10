@@ -58,11 +58,19 @@ router.get("/", checkToken, async (req, res) => {
 
     // Update file_path and thumbnail_path
     playlists.forEach((playlist) => {
-      if (playlist.file_path) {
-        playlist.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.file_path}`;
-      }
-      if (playlist.thumbnail_path) {
-        playlist.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.thumbnail_path}`;
+      if (item.server_location === "local") {
+        if (playlist.file_path) {
+          playlist.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.file_path}`;
+        }
+        if (playlist.thumbnail_path) {
+          playlist.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.thumbnail_path}`;
+        }
+        if (playlist.thumbnail_md) {
+          playlist.thumbnail_md = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.thumbnail_md}`;
+        }
+        if (playlist.thumbnail_lg) {
+          playlist.thumbnail_lg = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.thumbnail_lg}`;
+        }
       }
     });
 
@@ -127,11 +135,19 @@ router.get("/:playlistId/media", checkToken, async (req, res) => {
 
     // Update file_path and thumbnail_path
     media.forEach((item) => {
-      if (item.file_path) {
-        item.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${item.file_path}`;
-      }
-      if (item.thumbnail_path) {
-        item.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${item.thumbnail_path}`;
+      if (item.server_location === "local") {
+        if (item.file_path) {
+          item.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${item.file_path}`;
+        }
+        if (item.thumbnail_path) {
+          item.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${item.thumbnail_path}`;
+        }
+        if (item.thumbnail_md) {
+          item.thumbnail_md = `${SERVER_URL}:${SERVER_PORT}/file/${item.thumbnail_md}`;
+        }
+        if (item.thumbnail_lg) {
+          item.thumbnail_lg = `${SERVER_URL}:${SERVER_PORT}/file/${item.thumbnail_lg}`;
+        }
       }
     });
 

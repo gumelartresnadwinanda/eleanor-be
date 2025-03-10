@@ -59,11 +59,19 @@ router.get("/", checkToken, async (req, res) => {
 
     // Update file_path and thumbnail_path
     medias.forEach((media) => {
-      if (media.file_path) {
-        media.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${media.file_path}`;
-      }
-      if (media.thumbnail_path) {
-        media.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${media.thumbnail_path}`;
+      if (media.server_location === "local") {
+        if (media.file_path) {
+          media.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${media.file_path}`;
+        }
+        if (media.thumbnail_path) {
+          media.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${media.thumbnail_path}`;
+        }
+        if (media.thumbnail_md) {
+          media.thumbnail_md = `${SERVER_URL}:${SERVER_PORT}/file/${media.thumbnail_md}`;
+        }
+        if (media.thumbnail_lg) {
+          media.thumbnail_lg = `${SERVER_URL}:${SERVER_PORT}/file/${media.thumbnail_lg}`;
+        }
       }
     });
 

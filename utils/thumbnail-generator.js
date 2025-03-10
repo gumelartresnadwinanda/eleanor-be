@@ -9,6 +9,18 @@ async function generateImageThumbnail(imagePath, thumbnailPath) {
       .resize(200, 200, { fit: "inside" })
       .toFile(thumbnailPath);
     console.log(`Thumbnail generated for image: ${imagePath}`);
+
+    // Generate medium thumbnail
+    await sharp(imagePath)
+      .resize(400, 400, { fit: "inside" })
+      .toFile(thumbnailPath.replace(".jpg", "_md.jpg"));
+    console.log(`Medium thumbnail generated for image: ${imagePath}`);
+
+    // Generate large thumbnail
+    await sharp(imagePath)
+      .resize(800, 800, { fit: "inside" })
+      .toFile(thumbnailPath.replace(".jpg", "_lg.jpg"));
+    console.log(`Large thumbnail generated for image: ${imagePath}`);
   } catch (error) {
     console.error(`Error generating thumbnail for image: ${imagePath}`, error);
   }
@@ -23,8 +35,33 @@ async function generateVideoThumbnail(videoPath, thumbnailPath) {
         filename: path.basename(thumbnailPath),
         size: "200x?",
       })
-      .on("end", () => {
+      .on("end", async () => {
         console.log(`Thumbnail generated for video: ${videoPath}`);
+
+        // Generate medium thumbnail
+        await ffmpeg(videoPath)
+          .screenshots({
+            count: 1,
+            folder: path.dirname(thumbnailPath),
+            filename: path.basename(thumbnailPath).replace(".jpg", "_md.jpg"),
+            size: "400x?",
+          })
+          .on("end", () => {
+            console.log(`Medium thumbnail generated for video: ${videoPath}`);
+          });
+
+        // Generate large thumbnail
+        await ffmpeg(videoPath)
+          .screenshots({
+            count: 1,
+            folder: path.dirname(thumbnailPath),
+            filename: path.basename(thumbnailPath).replace(".jpg", "_lg.jpg"),
+            size: "800x?",
+          })
+          .on("end", () => {
+            console.log(`Large thumbnail generated for video: ${videoPath}`);
+          });
+
         resolve();
       })
       .on("error", (error) => {

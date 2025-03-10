@@ -135,6 +135,8 @@ async function processFile(filePath, mediaData) {
       duration: metadata.duration,
       tags: "",
       thumbnail_path: thumbnailPath,
+      thumbnail_md: thumbnailPath.replace(".jpg", "_md.jpg"),
+      thumbnail_lg: thumbnailPath.replace(".jpg", "_lg.jpg"),
       created_at: new Date(),
     };
 
