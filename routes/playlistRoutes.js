@@ -4,6 +4,9 @@ const checkToken = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
+const SERVER_PORT = process.env.SERVER_PORT || 5435;
+const SERVER_URL = process.env.SERVER_URL || "http://localhost";
+
 // GET route to fetch playlists with pagination, randomization, authentication check, and optional tag search
 router.get("/", checkToken, async (req, res) => {
   try {
@@ -52,6 +55,17 @@ router.get("/", checkToken, async (req, res) => {
     const count = await countQuery.count().first();
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
+
+    // Update file_path and thumbnail_path
+    playlists.forEach((playlist) => {
+      if (playlist.file_path) {
+        playlist.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.file_path}`;
+      }
+      if (playlist.thumbnail_path) {
+        playlist.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${playlist.thumbnail_path}`;
+      }
+    });
+
     res.json({ data: playlists, next, prev, count: count.count });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch playlists" });
@@ -110,6 +124,16 @@ router.get("/:playlistId/media", checkToken, async (req, res) => {
       .where("playlist_id", playlistId)
       .count()
       .first();
+
+    // Update file_path and thumbnail_path
+    media.forEach((item) => {
+      if (item.file_path) {
+        item.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${item.file_path}`;
+      }
+      if (item.thumbnail_path) {
+        item.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${item.thumbnail_path}`;
+      }
+    });
 
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;

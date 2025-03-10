@@ -5,6 +5,9 @@ const mediaFields = require("../constants/mediaFields");
 
 const router = express.Router();
 
+const SERVER_PORT = process.env.SERVER_PORT || 5435;
+const SERVER_URL = process.env.SERVER_URL || "http://localhost";
+
 // GET route to fetch media with pagination, randomization, authentication check, and optional tag search
 router.get("/", checkToken, async (req, res) => {
   try {
@@ -53,6 +56,17 @@ router.get("/", checkToken, async (req, res) => {
     const count = await countQuery.count().first();
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
+
+    // Update file_path and thumbnail_path
+    medias.forEach((media) => {
+      if (media.file_path) {
+        media.file_path = `${SERVER_URL}:${SERVER_PORT}/file/${media.file_path}`;
+      }
+      if (media.thumbnail_path) {
+        media.thumbnail_path = `${SERVER_URL}:${SERVER_PORT}/file/${media.thumbnail_path}`;
+      }
+    });
+
     res.json({ data: medias, next, prev, count: count.count });
   } catch (err) {
     res.status(500).json({ error: "Failed to fetch media" });

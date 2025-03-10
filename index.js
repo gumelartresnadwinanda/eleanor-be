@@ -3,6 +3,8 @@ const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
 const authMiddleware = require("./middleware/authMiddleware");
 const cors = require("cors");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
 app.use(bodyParser.json()); // Parse incoming JSON data
@@ -32,7 +34,20 @@ app.use("/medias", mediaRoutes);
 const playlistRoutes = require("./routes/playlistRoutes");
 app.use("/playlists", playlistRoutes);
 
-const PORT = process.env.PORT || 5435;
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
+app.get("/file/*", (req, res) => {
+  const requestedPath = req.params[0];
+  const fullPath = path.resolve(requestedPath);
+
+  if (fs.existsSync(fullPath)) {
+    res.sendFile(fullPath);
+  } else {
+    res.status(404).send("File not found");
+  }
+});
+
+const SERVER_PORT = process.env.SERVER_PORT || 5435;
+const SERVER_URL = process.env.SERVER_URL || "http://localhost";
+
+app.listen(SERVER_PORT, () => {
+  console.log(`Server is running on ${SERVER_URL}:${SERVER_PORT}`);
 });
