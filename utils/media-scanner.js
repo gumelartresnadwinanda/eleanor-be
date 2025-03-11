@@ -18,16 +18,17 @@ const TAGS = process.env.MEDIA_TAGS;
 const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK;
 const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
 const startBatch = parseInt(process.env.START_BATCH, 10) || 0;
+const USE_DIRECTORY_TAGS = process.env.USE_DIRECTORY_TAGS === "true";
 
 // Initialize Knex.js
 const db = knex(config.development);
 
 // Supported file extensions (added .mov and .cr2)
-const VIDEO_EXTENSIONS = [".mp4", ".mkv", ".mov"];
+const VIDEO_EXTENSIONS = [".mp4", ".mkv"];
 const PHOTO_EXTENSIONS = [".jpg", ".jpeg"];
 const MUSIC_EXTENSIONS = [".mp3"];
 const DOCUMENT_EXTENSIONS = [".pdf"];
-const RAW_EXTENSIONS = [".cr2"]; //skip for now since it's not supported when generating thumbnails
+// const RAW_EXTENSIONS = [".cr2"]; //skip for now since it's not supported when generating thumbnails
 
 const SUPPORTED_EXTENSIONS = [
   ...VIDEO_EXTENSIONS,
@@ -129,6 +130,18 @@ async function extractMetadata(filePath) {
   }
 }
 
+function extractTagsFromPath(filePath) {
+  const parts = filePath.split(path.sep);
+  return parts
+    .slice(1, -1)
+    .filter(
+      (part) =>
+        !/^[A-Z]:$/i.test(part) &&
+        !["photo", "video"].includes(part.toLowerCase())
+    )
+    .map((part) => part.toLowerCase());
+}
+
 async function processFile(filePath, mediaData) {
   const ext = path.extname(filePath).toLowerCase();
   if (SUPPORTED_EXTENSIONS.includes(ext)) {
@@ -172,12 +185,19 @@ async function processFile(filePath, mediaData) {
         }
       }
 
+      const directoryTags = USE_DIRECTORY_TAGS
+        ? extractTagsFromPath(filePath)
+        : [];
+      const combinedTags = [
+        ...new Set([...directoryTags, ...(TAGS ? TAGS.split(",") : [])]),
+      ].join(",");
+
       const mediaEntry = {
         title: metadata.title,
         file_path: filePath,
         file_type: metadata.file_type,
         duration: metadata.duration,
-        tags: TAGS || "",
+        tags: combinedTags,
         thumbnail_path: thumbnailPath,
         thumbnail_md: thumbnailPath.replace(".jpg", "_md.jpg"),
         thumbnail_lg: thumbnailPath.replace(".jpg", "_lg.jpg"),

@@ -2,8 +2,9 @@ require("dotenv").config();
 const fs = require("fs").promises;
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
+const express = require("express");
 
-const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
+const MEDIA_FOLDER = process.env.MEDIA_OPTIMIZE_FOLDER;
 
 if (!MEDIA_FOLDER) {
   throw new Error("MEDIA_FOLDER environment variable is not defined.");
@@ -11,6 +12,13 @@ if (!MEDIA_FOLDER) {
 
 console.log(`MEDIA_FOLDER is set to: ${MEDIA_FOLDER}`);
 
+const app = express();
+const port = 6002;
+
+let optimizationStatus = [];
+let optimizedVideos = [];
+
+// Function to log the result of the optimization process
 async function logResult(filePath, logPath, reason = null) {
   let log = [];
   try {
@@ -31,15 +39,16 @@ async function logResult(filePath, logPath, reason = null) {
   }
 }
 
+// Function to optimize a video file
 async function optimizeVideo(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (ext !== ".mov") {
     console.log(`Skipping non-MOV file: ${filePath}`);
+    console.log("--------------------------------------------------");
     return;
   }
 
   const fileName = path.basename(filePath, ".MOV");
-
   const outputFilePath = path.join(path.dirname(filePath), `${fileName}.mp4`);
   const successLog = path.join(path.dirname(filePath), "success.json");
   const failLog = path.join(path.dirname(filePath), "fail.json");
@@ -48,15 +57,19 @@ async function optimizeVideo(filePath) {
   try {
     await fs.access(outputFilePath);
     console.log(`Skipping already optimized file: ${outputFilePath}`);
+    console.log("--------------------------------------------------");
     return;
   } catch (error) {
     if (error.code !== "ENOENT") {
       console.error(`Error checking file existence: ${outputFilePath}`, error);
+      console.log("--------------------------------------------------");
       return;
     }
   }
 
   try {
+    const originalStat = await fs.stat(filePath);
+
     return new Promise((resolve, reject) => {
       ffmpeg(filePath)
         .outputOptions([
@@ -66,18 +79,42 @@ async function optimizeVideo(filePath) {
         ])
         .output(outputFilePath)
         .on("progress", (progress) => {
-          console.log(
-            `Processing: ${filePath} - ${progress.percent.toFixed(2)}% done`
+          const existingIndex = optimizationStatus.findIndex(
+            (status) => status.filePath === filePath
           );
+          if (existingIndex !== -1) {
+            optimizationStatus[existingIndex].progress =
+              progress.percent.toFixed(2);
+          } else {
+            optimizationStatus.push({
+              filePath,
+              progress: progress.percent.toFixed(2),
+            });
+          }
         })
         .on("end", async () => {
           console.log(`Optimized video saved: ${outputFilePath}`);
+          await fs.utimes(
+            outputFilePath,
+            originalStat.birthtime,
+            originalStat.birthtime
+          );
+
           await logResult(filePath, successLog);
+          optimizedVideos.push(filePath);
+          optimizationStatus = optimizationStatus.filter(
+            (status) => status.filePath !== filePath
+          );
+          console.log("--------------------------------------------------");
           resolve();
         })
         .on("error", async (error) => {
           console.error(`Error optimizing video: ${filePath}`, error);
           await logResult(filePath, failLog, error.message);
+          optimizationStatus = optimizationStatus.filter(
+            (status) => status.filePath !== filePath
+          );
+          console.log("--------------------------------------------------");
           reject(error);
         })
         .run();
@@ -85,12 +122,15 @@ async function optimizeVideo(filePath) {
   } catch (error) {
     console.error(`Error processing file: ${filePath}`, error);
     await logResult(filePath, failLog, error.message);
+    console.log("--------------------------------------------------");
   }
 }
 
+// Function to scan the media folder and optimize videos
 async function scanAndOptimize(folderPath = MEDIA_FOLDER) {
   if (!folderPath) {
     console.error("Folder path is undefined.");
+    console.log("--------------------------------------------------");
     return;
   }
 
@@ -103,6 +143,7 @@ async function scanAndOptimize(folderPath = MEDIA_FOLDER) {
       if (stat.isDirectory()) {
         if (file.toLowerCase() === "optimized") {
           console.log(`Skipping optimized directory: ${filePath}`);
+          console.log("--------------------------------------------------");
           continue;
         }
         await scanAndOptimize(filePath);
@@ -112,7 +153,23 @@ async function scanAndOptimize(folderPath = MEDIA_FOLDER) {
     }
   } catch (error) {
     console.error("Error scanning media folder:", error);
+    console.log("--------------------------------------------------");
   }
 }
 
-scanAndOptimize();
+// Endpoint to get the status of the optimization process
+app.get("/status", (req, res) => {
+  res.json({
+    optimizationStatus,
+    optimizedVideos,
+    totalVideos: optimizationStatus.length + optimizedVideos.length,
+    totalDoneOptimizing: optimizedVideos.length,
+  });
+});
+
+// Start the server and begin scanning and optimizing videos
+app.listen(port, () => {
+  console.log(`Server is running on http://localhost:${port}`);
+  console.log("--------------------------------------------------");
+  scanAndOptimize();
+});

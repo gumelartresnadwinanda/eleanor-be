@@ -29,6 +29,7 @@
     "scan-media": "cross-env BATCH_SIZE=10 START_BATCH=0 node utils/media-scanner.js",
     "migrate": "knex migrate:latest",
     "scan-directories": "node utils/directory-scanner.js",
-    "optimize-videos": "node utils/video-optimizer.js"
+    "optimize-videos": "node utils/video-optimizer.js",
+    "update-created-date": "node utils/update-created-date.js"
   }
 }
