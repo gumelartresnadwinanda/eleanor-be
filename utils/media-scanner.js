@@ -14,6 +14,8 @@ const {
 const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
 const TEST_MODE = process.env.MEDIA_TEST_MODE === "true";
 const OUTPUT_FILE = process.env.MEDIA_OUTPUT_FILE;
+const TAGS = process.env.MEDIA_TAGS;
+const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK;
 const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
 const startBatch = parseInt(process.env.START_BATCH, 10) || 0;
 
@@ -175,7 +177,7 @@ async function processFile(filePath, mediaData) {
         file_path: filePath,
         file_type: metadata.file_type,
         duration: metadata.duration,
-        tags: process.env.TAGS || "",
+        tags: TAGS || "",
         thumbnail_path: thumbnailPath,
         thumbnail_md: thumbnailPath.replace(".jpg", "_md.jpg"),
         thumbnail_lg: thumbnailPath.replace(".jpg", "_lg.jpg"),
@@ -257,7 +259,9 @@ async function scanMediaFolder(
               return;
             }
             // Recursively scan nested directories
-            // await scanMediaFolder(filePath, mediaData, batchSize, 0);
+            if (CHECK_RECURSIVE) {
+              await scanMediaFolder(filePath, mediaData, batchSize, 0);
+            }
           } else {
             try {
               await processFile(filePath, mediaData);
