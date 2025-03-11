@@ -48,6 +48,13 @@ async function generateVideoThumbnail(videoPath, thumbnailPath) {
           })
           .on("end", () => {
             console.log(`Medium thumbnail generated for video: ${videoPath}`);
+          })
+          .on("error", (error) => {
+            console.error(
+              `Error generating medium thumbnail for video: ${videoPath}`,
+              error
+            );
+            reject(error);
           });
 
         // Generate large thumbnail
@@ -60,6 +67,13 @@ async function generateVideoThumbnail(videoPath, thumbnailPath) {
           })
           .on("end", () => {
             console.log(`Large thumbnail generated for video: ${videoPath}`);
+          })
+          .on("error", (error) => {
+            console.error(
+              `Error generating large thumbnail for video: ${videoPath}`,
+              error
+            );
+            reject(error);
           });
 
         resolve();

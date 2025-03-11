@@ -18,6 +18,7 @@ router.get("/", checkToken, async (req, res) => {
       is_random = false,
       tags,
       match_all_tags = false,
+      file_type,
     } = req.query;
     const offset = (page - 1) * limit;
 
@@ -28,28 +29,41 @@ router.get("/", checkToken, async (req, res) => {
     }
 
     if (tags) {
-      const tagsArray = tags.split(",");
+      const tagsArray = tags.split(",").map((tag) => tag.toLowerCase());
       if (match_all_tags === "true") {
         query = query.where((builder) => {
           tagsArray.forEach((tag) => {
-            builder.andWhere("tags", "like", `%${tag}%`);
+            builder
+              .andWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
+              .orWhere(db.raw("LOWER(tags)"), "=", tag);
           });
         });
       } else {
         query = query.where((builder) => {
           tagsArray.forEach((tag) => {
-            builder.orWhere("tags", "like", `%${tag}%`);
+            builder
+              .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
+              .orWhere(db.raw("LOWER(tags)"), "=", tag);
           });
         });
       }
     }
 
-    // Apply randomization or pagination
+    // Add file_type filter
+    if (file_type) {
+      query = query.where("file_type", file_type);
+    }
+
+    // Apply sorting, randomization, or pagination
     const countQuery = query.clone();
     if (is_random === "true") {
       query = query.orderByRaw("RANDOM()");
     } else {
-      query = query.offset(offset).limit(limit);
+      query = query.orderBy("created_at", "desc").offset(offset).limit(limit);
     }
 
     // Execute the query and send the response

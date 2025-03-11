@@ -27,17 +27,25 @@ router.get("/", checkToken, async (req, res) => {
     }
 
     if (tags) {
-      const tagsArray = tags.split(",");
+      const tagsArray = tags.split(",").map((tag) => tag.toLowerCase());
       if (match_all_tags === "true") {
         query = query.where((builder) => {
           tagsArray.forEach((tag) => {
-            builder.andWhere("tags", "like", `%${tag}%`);
+            builder
+              .andWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
+              .orWhere(db.raw("LOWER(tags)"), "=", tag);
           });
         });
       } else {
         query = query.where((builder) => {
           tagsArray.forEach((tag) => {
-            builder.orWhere("tags", "like", `%${tag}%`);
+            builder
+              .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
+              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
+              .orWhere(db.raw("LOWER(tags)"), "=", tag);
           });
         });
       }
