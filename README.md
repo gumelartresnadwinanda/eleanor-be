@@ -52,7 +52,7 @@ Eleanor Media Server is a media server application for managing and serving medi
    npm run dev
    ```
 
-3. The server will be running on `http://localhost:5435`.
+3. The server will be running on `http://localhost:5002`.
 
 ## License
 

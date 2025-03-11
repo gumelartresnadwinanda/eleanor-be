@@ -1,10 +1,11 @@
+require("dotenv").config();
 const express = require("express");
 const db = require("../db/connection");
 const checkToken = require("../middleware/authMiddleware");
 
 const router = express.Router();
 
-const SERVER_PORT = process.env.SERVER_PORT || 5435;
+const SERVER_PORT = process.env.SERVER_PORT || 5002;
 const SERVER_URL = process.env.SERVER_URL || "http://localhost";
 
 // GET route to fetch playlists with pagination, randomization, authentication check, and optional tag search

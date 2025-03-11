@@ -1,10 +1,13 @@
-const express = require("express");
 const bodyParser = require("body-parser");
 const cookieParser = require("cookie-parser");
-const authMiddleware = require("./middleware/authMiddleware");
 const cors = require("cors");
-const path = require("path");
+const express = require("express");
 const fs = require("fs");
+const path = require("path");
+require("dotenv").config();
+const authMiddleware = require("./middleware/authMiddleware");
+
+const allowedOrigins = process.env.CORS_ORIGINS?.split(",") || [];
 
 const app = express();
 app.use(bodyParser.json()); // Parse incoming JSON data
@@ -45,7 +48,7 @@ app.get("/file/*", (req, res) => {
   }
 });
 
-const SERVER_PORT = process.env.SERVER_PORT || 5435;
+const SERVER_PORT = process.env.SERVER_PORT || 5002;
 const SERVER_URL = process.env.SERVER_URL || "http://localhost";
 
 app.listen(SERVER_PORT, () => {
