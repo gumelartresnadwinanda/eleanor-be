@@ -37,6 +37,9 @@ app.use("/medias", mediaRoutes);
 const playlistRoutes = require("./routes/playlistRoutes");
 app.use("/playlists", playlistRoutes);
 
+const tagsRoutes = require("./routes/tagsRoutes");
+app.use("/tags", tagsRoutes);
+
 app.get("/file/*", (req, res) => {
   const requestedPath = req.params[0];
   const fullPath = path.resolve(requestedPath);

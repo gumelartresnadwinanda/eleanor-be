@@ -160,10 +160,9 @@ async function scanAndOptimize(folderPath = MEDIA_FOLDER) {
 // Endpoint to get the status of the optimization process
 app.get("/status", (req, res) => {
   res.json({
+    totalDoneOptimizing: optimizedVideos.length,
     optimizationStatus,
     optimizedVideos,
-    totalVideos: optimizationStatus.length + optimizedVideos.length,
-    totalDoneOptimizing: optimizedVideos.length,
   });
 });
 

@@ -7,6 +7,7 @@ const config = require("../knexfile");
 const db = knex(config.development);
 const MEDIA_FOLDER = process.env.MEDIA_OPTIMIZE_FOLDER;
 const SKIPPED_FILES_LOG = path.join(__dirname, "../output/skipped_files.json");
+const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK === "true";
 
 async function updateCreatedDate(folderPath) {
   let skippedFiles = [];
@@ -15,7 +16,8 @@ async function updateCreatedDate(folderPath) {
     const files = await fs.readdir(folderPath, { withFileTypes: true });
     for (const file of files) {
       const filePath = path.join(folderPath, file.name);
-      if (file.isDirectory()) {
+      if (file.isDirectory() && !!CHECK_RECURSIVE) {
+        console.log(`Processing subdirectory: ${filePath}`);
         await updateCreatedDate(filePath); // Recursively process subdirectories
       } else {
         const ext = path.extname(file.name).toLowerCase();
@@ -27,19 +29,16 @@ async function updateCreatedDate(folderPath) {
           try {
             const movStat = await fs.stat(movFilePath);
             const createdAt = movStat.birthtime;
-
-            const updatedRows = await db("media")
+            await db("media")
               .where("file_path", filePath)
-              .update({ created_at: createdAt });
-
-            if (updatedRows === 0) {
-              console.log(`No database record for ${file.name}, skipping...`);
-              skippedFiles.push(file.name);
-            } else {
-              console.log(
-                `Updated created_at for ${file.name} to ${createdAt}`
-              );
-            }
+              .update({ created_at: createdAt })
+              .catch(() => {
+                console.error(`Error querying database for ${file.name}:`);
+                console.log(`No database record for ${file.name}, skipping...`);
+                skippedFiles.push(file.name);
+                return null;
+              });
+            console.log(`Updated created_at for ${file.name} to ${createdAt}`);
           } catch (error) {
             if (error.code === "ENOENT") {
               console.log(
@@ -48,6 +47,23 @@ async function updateCreatedDate(folderPath) {
             } else {
               console.error(`Error reading ${movFilePath}:`, error);
             }
+          }
+        } else if (ext === ".jpg" || ext === ".jpeg") {
+          try {
+            const fileStat = await fs.stat(filePath);
+            const modifiedAt = fileStat.mtime;
+            await db("media")
+              .where("file_path", filePath)
+              .update({ created_at: modifiedAt })
+              .catch(() => {
+                console.error(`Error querying database for ${file.name}:`);
+                console.log(`No database record for ${file.name}, skipping...`);
+                skippedFiles.push(file.name);
+                return null;
+              });
+            console.log(`Updated created_at for ${file.name} to ${modifiedAt}`);
+          } catch (error) {
+            console.error(`Error reading ${filePath}:`, error);
           }
         }
       }

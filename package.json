@@ -26,10 +26,11 @@
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "scan-media": "cross-env BATCH_SIZE=10 START_BATCH=0 node utils/media-scanner.js",
+    "scan-media": "cross-env BATCH_SIZE=5 START_BATCH=0 node utils/media-scanner.js",
     "migrate": "knex migrate:latest",
     "scan-directories": "node utils/directory-scanner.js",
     "optimize-videos": "node utils/video-optimizer.js",
-    "update-created-date": "node utils/update-created-date.js"
+    "update-created-date": "node utils/update-created-date.js",
+    "create-thumbnails": "node utils/thumbnail-creator.js"
   }
 }

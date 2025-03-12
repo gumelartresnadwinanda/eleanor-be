@@ -15,7 +15,7 @@ const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
 const TEST_MODE = process.env.MEDIA_TEST_MODE === "true";
 const OUTPUT_FILE = process.env.MEDIA_OUTPUT_FILE;
 const TAGS = process.env.MEDIA_TAGS;
-const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK;
+const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK === "true";
 const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
 const startBatch = parseInt(process.env.START_BATCH, 10) || 0;
 const USE_DIRECTORY_TAGS = process.env.USE_DIRECTORY_TAGS === "true";

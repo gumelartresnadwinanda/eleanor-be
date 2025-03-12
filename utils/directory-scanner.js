@@ -11,7 +11,7 @@ async function scanDirectories(directoryPath, result = []) {
     const files = await fs.readdir(directoryPath, { withFileTypes: true });
 
     for (const file of files) {
-      if (file.isDirectory()) {
+      if (file.isDirectory() && !file.name.includes("thumbnails")) {
         const fullPath = path.join(directoryPath, file.name);
         result.push(fullPath);
         await scanDirectories(fullPath, result);
