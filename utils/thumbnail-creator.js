@@ -8,8 +8,7 @@ const {
 } = require("./thumbnail-generator");
 
 // Environment variables
-// const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
-const MEDIA_FOLDER = "D:\\Photo";
+const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
 const port = 6003;
 
 const app = express();

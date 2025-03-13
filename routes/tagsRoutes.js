@@ -63,6 +63,8 @@ router.get("/", checkToken, async (req, res) => {
       query = query.where("is_protected", false);
     }
 
+    query = query.where("is_hidden", false);
+
     const tags = await query;
     const count = await query.count().first();
     const next = page * limit < count.count ? page + 1 : null;

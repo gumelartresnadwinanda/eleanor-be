@@ -19,6 +19,12 @@ const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK === "true";
 const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
 const startBatch = parseInt(process.env.START_BATCH, 10) || 0;
 const USE_DIRECTORY_TAGS = process.env.USE_DIRECTORY_TAGS === "true";
+const MEDIA_EXCLUDED_DIRECTORIES = process.env.MEDIA_EXCLUDED_DIRECTORIES
+  ? process.env.MEDIA_EXCLUDED_DIRECTORIES.split(",").map((dir) =>
+      dir.toLowerCase()
+    )
+  : [];
+const MEDIA_IS_PROTECTED = process.env.MEDIA_IS_PROTECTED === "true";
 
 // Initialize Knex.js
 const db = knex(config.development);
@@ -137,7 +143,9 @@ function extractTagsFromPath(filePath) {
     .filter(
       (part) =>
         !/^[A-Z]:$/i.test(part) &&
-        !["photo", "video"].includes(part.toLowerCase())
+        !["photo", "video", ...MEDIA_EXCLUDED_DIRECTORIES].includes(
+          part.toLowerCase()
+        )
     )
     .map((part) => part.toLowerCase());
 }
@@ -202,7 +210,7 @@ async function processFile(filePath, mediaData) {
         thumbnail_md: thumbnailPath.replace(".jpg", "_md.jpg"),
         thumbnail_lg: thumbnailPath.replace(".jpg", "_lg.jpg"),
         created_at: metadata.created_at || new Date(),
-        is_protected: process.env.IS_PROTECTED || false,
+        is_protected: MEDIA_IS_PROTECTED || false,
       };
 
       if (TEST_MODE) {
