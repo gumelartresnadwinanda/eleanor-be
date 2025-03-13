@@ -48,7 +48,7 @@ async function updateCreatedDate(folderPath) {
               console.error(`Error reading ${movFilePath}:`, error);
             }
           }
-        } else if (ext === ".jpg" || ext === ".jpeg") {
+        } else if (ext === ".jpg" || ext === ".jpeg" || ext === ".png") {
           try {
             const fileStat = await fs.stat(filePath);
             const modifiedAt = fileStat.mtime;

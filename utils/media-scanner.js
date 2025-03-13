@@ -31,7 +31,7 @@ const db = knex(config.development);
 
 // Supported file extensions (added .mov and .cr2)
 const VIDEO_EXTENSIONS = [".mp4", ".mkv"];
-const PHOTO_EXTENSIONS = [".jpg", ".jpeg"];
+const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png"];
 const MUSIC_EXTENSIONS = [".mp3"];
 const DOCUMENT_EXTENSIONS = [".pdf"];
 // const RAW_EXTENSIONS = [".cr2"]; //skip for now since it's not supported when generating thumbnails
@@ -138,7 +138,7 @@ async function extractMetadata(filePath) {
 
 function extractTagsFromPath(filePath) {
   const parts = filePath.split(path.sep);
-  return parts
+  const tagsFromPath = parts
     .slice(1, -1)
     .filter(
       (part) =>
@@ -148,6 +148,15 @@ function extractTagsFromPath(filePath) {
         )
     )
     .map((part) => part.toLowerCase());
+
+  const fileName = path.basename(filePath, path.extname(filePath));
+  const firstTagFromFileName = fileName.includes("_")
+    ? fileName.split("_")[0].toLowerCase()
+    : null;
+
+  return firstTagFromFileName
+    ? [...tagsFromPath, firstTagFromFileName]
+    : tagsFromPath;
 }
 
 async function processFile(filePath, mediaData) {
