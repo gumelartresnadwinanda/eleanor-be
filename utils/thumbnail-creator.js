@@ -1,167 +1,81 @@
-require("dotenv").config();
-const fs = require("fs").promises;
+const fs = require("fs");
 const path = require("path");
-const express = require("express");
 const {
   generateImageThumbnail,
   generateVideoThumbnail,
 } = require("./thumbnail-generator");
 
-// Environment variables
-const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
-const port = 6003;
+async function processDirectory(directoryPath) {
+  const results = {
+    success: [],
+    failed: [],
+    skipped: [],
+  };
 
-const app = express();
-let processedFiles = [];
+  const files = fs.readdirSync(directoryPath);
 
-// Supported file extensions
-const VIDEO_EXTENSIONS = [".mp4", ".mkv"];
-const PHOTO_EXTENSIONS = [".jpg", ".jpeg"];
-const SUPPORTED_EXTENSIONS = [...VIDEO_EXTENSIONS, ...PHOTO_EXTENSIONS];
-const BATCH_SIZE = 5;
-const OUTPUT_SUMMARY_FILE = path.join(__dirname, "../output/scan_summary.json");
+  for (const file of files) {
+    const filePath = path.join(directoryPath, file);
+    const ext = path.extname(file).toLowerCase();
+    const thumbnailDir = path.join(directoryPath, "thumbnails");
 
-// Ensure the thumbnail directory exists
-async function ensureDirectoryExists(directory) {
-  try {
-    await fs.mkdir(directory, { recursive: true });
-  } catch (error) {
-    if (error.code !== "EEXIST") {
-      throw error;
+    if (fs.lstatSync(filePath).isDirectory()) {
+      if (file === "thumbnails") {
+        console.log(`====================`);
+        console.log(`Skipping thumbnails directory: ${filePath}`);
+        continue;
+      }
+      console.log(`====================`);
+      console.log(`Processing subdirectory: ${filePath}`);
+      const subdirResults = await processDirectory(filePath);
+      results.success.push(...subdirResults.success);
+      results.failed.push(...subdirResults.failed);
+      results.skipped.push(...subdirResults.skipped);
+      continue;
     }
-  }
-}
 
-// Function to process a single file and generate thumbnails
-async function processFile(filePath) {
-  const ext = path.extname(filePath).toLowerCase();
-  if (SUPPORTED_EXTENSIONS.includes(ext)) {
-    // console.log("==================================================");
-    // console.log(`Processing file: ${filePath}`);
-    // console.log("==================================================");
-
-    const thumbnailDir = path.join(path.dirname(filePath), "thumbnails");
-    await ensureDirectoryExists(thumbnailDir);
+    if (!fs.existsSync(thumbnailDir)) {
+      fs.mkdirSync(thumbnailDir);
+    }
 
     const thumbnailPath = path.join(
       thumbnailDir,
       `thumb_${path.basename(filePath, ext)}.jpg`
     );
 
-    // Check if the thumbnail already exists
+    if (fs.existsSync(thumbnailPath)) {
+      console.log(`====================`);
+      console.log(`Skipping existing thumbnail for file: ${filePath}`);
+      results.skipped.push(file);
+      continue;
+    }
+
     try {
-      await fs.access(thumbnailPath);
-      console.log("==================================================");
-      console.log(`Thumbnail already exists: ${thumbnailPath}`);
-      console.log("==================================================");
-      processedFiles.push({ filePath, status: "exists" });
-    } catch (error) {
-      if (error.code === "ENOENT") {
-        // Thumbnail does not exist, generate a new one
-        try {
-          if (PHOTO_EXTENSIONS.includes(ext)) {
-            await generateImageThumbnail(filePath, thumbnailPath);
-          } else if (VIDEO_EXTENSIONS.includes(ext)) {
-            await generateVideoThumbnail(filePath, thumbnailPath);
-          }
-          processedFiles.push({ filePath, status: "generated" });
-        } catch (thumbnailError) {
-          console.error(
-            `Error generating thumbnail for ${filePath}:`,
-            thumbnailError
-          );
-          processedFiles.push({
-            filePath,
-            status: "error",
-            error: thumbnailError.message,
-          });
-        }
+      console.log(`====================`);
+      console.log(`Generating thumbnail for file: ${filePath}`);
+      if (ext === ".jpg" || ext === ".jpeg" || ext === ".png") {
+        await generateImageThumbnail(filePath, thumbnailPath);
+        results.success.push(file);
+      } else if (ext === ".mp4" || ext === ".avi" || ext === ".mkv") {
+        await generateVideoThumbnail(filePath, thumbnailPath);
+        results.success.push(file);
       } else {
-        throw error;
+        console.log(`Skipping unsupported file type: ${filePath}`);
+        results.skipped.push(file);
       }
-    }
-    processedFiles.push(filePath);
-  }
-}
-
-// Function to scan the media folder and process files in batches
-async function scanMediaFolder(folderPath = MEDIA_FOLDER) {
-  try {
-    const files = await fs.readdir(folderPath);
-    const totalFiles = files.length;
-    const totalBatches = Math.ceil(totalFiles / BATCH_SIZE);
-
-    for (let batch = 0; batch < totalBatches; batch++) {
-      const start = batch * BATCH_SIZE;
-      const end = Math.min(start + BATCH_SIZE, totalFiles);
-      const batchFiles = files.slice(start, end);
-
-      await Promise.all(
-        batchFiles.map(async (file) => {
-          const filePath = path.join(folderPath, file);
-          const stat = await fs.stat(filePath);
-
-          if (stat.isDirectory()) {
-            if (file.toLowerCase() === "thumbnails") {
-              console.log("==================================================");
-              console.log(`Skipping thumbnails directory: ${filePath}`);
-              console.log("==================================================");
-              return;
-            }
-            // Recursively scan nested directories
-            await scanMediaFolder(filePath);
-          } else {
-            await processFile(filePath);
-          }
-        })
+    } catch (error) {
+      console.log(`====================`);
+      console.error(
+        `Failed to generate thumbnail for file: ${filePath}`,
+        error
       );
-
-      console.log(`Processed batch ${batch + 1} of ${totalBatches}`);
+      results.failed.push(file);
     }
-
-    console.log("==================================================");
-    console.log("FINISHED SCANNING");
-    console.log("==================================================");
-  } catch (error) {
-    console.error("Error scanning media folder:", error);
   }
+
+  return results;
 }
 
-// Function to save the scan summary to a JSON file
-async function saveScanSummary() {
-  const summary = {
-    totalProcessed: processedFiles.length,
-    processedFiles,
-  };
-  try {
-    await fs.writeFile(OUTPUT_SUMMARY_FILE, JSON.stringify(summary, null, 2));
-    console.log(`Scan summary saved to ${OUTPUT_SUMMARY_FILE}`);
-  } catch (error) {
-    console.error("Error writing scan summary:", error);
-  }
-}
-
-// Endpoint to get the status of the thumbnail generation process
-app.get("/status", (req, res) => {
-  const generatingStatus = processedFiles.filter(
-    (file) => file.status === "generated" || file.status === "error"
-  );
-  res.json({
-    totalProcessed: processedFiles.length,
-    generatingStatus,
-  });
-});
-
-// Start the server and begin scanning and generating thumbnails
-const server = app.listen(port, () => {
-  console.log("==================================================");
-  console.log(`Server is running on http://localhost:${port}`);
-  console.log("==================================================");
-  scanMediaFolder().then(async () => {
-    console.log("==================================================");
-    console.log("Shutting down the server...");
-    console.log("==================================================");
-    await saveScanSummary();
-    server.close();
-  });
-});
+module.exports = {
+  processDirectory,
+};

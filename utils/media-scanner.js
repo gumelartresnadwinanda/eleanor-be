@@ -2,22 +2,14 @@ require("dotenv").config();
 const fs = require("fs").promises;
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
-const exif = require("exif-reader");
 const knex = require("knex");
 const config = require("../knexfile");
-const {
-  generateImageThumbnail,
-  generateVideoThumbnail,
-} = require("./thumbnail-generator");
 
 // Environment variables
 const MEDIA_FOLDER = process.env.MEDIA_FOLDER;
-const TEST_MODE = process.env.MEDIA_TEST_MODE === "true";
-const OUTPUT_FILE = process.env.MEDIA_OUTPUT_FILE;
 const TAGS = process.env.MEDIA_TAGS;
 const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK === "true";
-const batchSize = parseInt(process.env.BATCH_SIZE, 10) || 10;
-const startBatch = parseInt(process.env.START_BATCH, 10) || 0;
+const batchSize = 5;
 const USE_DIRECTORY_TAGS = process.env.USE_DIRECTORY_TAGS === "true";
 const MEDIA_EXCLUDED_DIRECTORIES = process.env.MEDIA_EXCLUDED_DIRECTORIES
   ? process.env.MEDIA_EXCLUDED_DIRECTORIES.split(",").map((dir) =>
@@ -44,17 +36,6 @@ const SUPPORTED_EXTENSIONS = [
 ];
 
 module.exports = SUPPORTED_EXTENSIONS;
-
-// Ensure the thumbnail directory exists
-async function ensureDirectoryExists(directory) {
-  try {
-    await fs.mkdir(directory, { recursive: true });
-  } catch (error) {
-    if (error.code !== "EEXIST") {
-      throw error;
-    }
-  }
-}
 
 // Ensure ffmpeg and ffprobe are installed and accessible
 ffmpeg.getAvailableFormats((err) => {
@@ -89,7 +70,7 @@ async function extractMetadata(filePath) {
   if ([...VIDEO_EXTENSIONS, ...MUSIC_EXTENSIONS].includes(ext)) {
     // Extract metadata for video/audio files using ffmpeg
     return new Promise((resolve, reject) => {
-      ffmpeg.ffprobe(filePath, (err, metadata) => {
+      ffmpeg.ffprobe(filePath, async (err, metadata) => {
         if (err) {
           console.error(
             `Error extracting metadata with ffmpeg for ${filePath}:`,
@@ -97,35 +78,33 @@ async function extractMetadata(filePath) {
           );
           return reject(err);
         }
-        resolve({
-          title: path.basename(filePath, ext),
-          duration: metadata.format.duration || null,
-          file_type: ext === ".mp3" ? "music" : "video",
-          created_at: metadata.format.tags.creation_time || null,
-        });
+        try {
+          const fileStat = await fs.stat(filePath);
+          resolve({
+            title: path.basename(filePath, ext),
+            duration: metadata.format.duration || null,
+            file_type: ext === ".mp3" ? "music" : "video",
+            created_at: fileStat.mtime,
+          });
+        } catch (statError) {
+          console.error(`Error getting file stats for ${filePath}:`, statError);
+          reject(statError);
+        }
       });
     });
   } else if ([...PHOTO_EXTENSIONS].includes(ext)) {
-    // Extract metadata for image files using exif-reader
     try {
-      const fileBuffer = await fs.readFile(filePath);
-      const exifData = exif(fileBuffer);
+      const fileStat = await fs.stat(filePath);
       return {
         title: path.basename(filePath, ext),
         duration: null,
         file_type: "photo",
-        exif: exifData,
+        created_at: fileStat.mtime,
       };
     } catch (error) {
-      console.warn(`Error extracting EXIF data from ${filePath}:`, error);
-      return {
-        title: path.basename(filePath, ext),
-        duration: null,
-        file_type: "photo",
-      };
+      console.warn(`Error extracting data from ${filePath}:`, error);
     }
   } else if (ext === ".pdf") {
-    // Handle PDF files
     return {
       title: path.basename(filePath, ext),
       duration: null,
@@ -169,38 +148,11 @@ async function processFile(filePath, mediaData) {
       if (!metadata) return;
 
       const thumbnailDir = path.join(path.dirname(filePath), "thumbnails");
-      await ensureDirectoryExists(thumbnailDir);
 
       const thumbnailPath = path.join(
         thumbnailDir,
         `thumb_${path.basename(filePath, ext)}.jpg`
       );
-
-      // Check if the thumbnail already exists
-      try {
-        await fs.access(thumbnailPath);
-        console.log(`Thumbnail already exists: ${thumbnailPath}`);
-      } catch (error) {
-        if (error.code === "ENOENT") {
-          // Thumbnail does not exist, generate a new one
-          try {
-            if ([...PHOTO_EXTENSIONS].includes(ext)) {
-              await generateImageThumbnail(filePath, thumbnailPath);
-            } else if ([...VIDEO_EXTENSIONS].includes(ext)) {
-              await generateVideoThumbnail(filePath, thumbnailPath);
-            }
-          } catch (thumbnailError) {
-            console.error(
-              `Error generating thumbnail for ${filePath}:`,
-              thumbnailError
-            );
-            await logError(filePath, thumbnailError.message);
-            return; // Skip this file
-          }
-        } else {
-          throw error;
-        }
-      }
 
       const directoryTags = USE_DIRECTORY_TAGS
         ? extractTagsFromPath(filePath)
@@ -222,17 +174,13 @@ async function processFile(filePath, mediaData) {
         is_protected: MEDIA_IS_PROTECTED || false,
       };
 
-      if (TEST_MODE) {
-        mediaData.push({ ...mediaEntry, exif: metadata.exif });
-      } else {
-        try {
-          await db("media").insert(mediaEntry);
-        } catch (error) {
-          if (error.code === "23505") {
-            console.log(`Media file already exists: ${filePath}`);
-          } else {
-            throw error;
-          }
+      try {
+        await db("media").insert(mediaEntry);
+      } catch (error) {
+        if (error.code === "23505") {
+          console.log(`Media file already exists: ${filePath}`);
+        } else {
+          throw error;
         }
       }
 
@@ -311,14 +259,7 @@ async function scanMediaFolder(
 
       console.log(`Processed batch ${batch + 1} of ${totalBatches}`);
     }
-
-    if (TEST_MODE && folderPath === MEDIA_FOLDER) {
-      // Write media data to a file
-      await fs.writeFile(OUTPUT_FILE, JSON.stringify(mediaData, null, 2));
-      console.log(`Media data written to ${OUTPUT_FILE}`);
-    } else if (!TEST_MODE && folderPath === MEDIA_FOLDER) {
-      console.log("Media data inserted into the database.");
-    }
+    console.log("Media data inserted into the database.");
   } catch (error) {
     console.error("Error scanning media folder:", error);
   } finally {
@@ -329,4 +270,4 @@ async function scanMediaFolder(
   }
 }
 
-scanMediaFolder(MEDIA_FOLDER, [], batchSize, startBatch);
+scanMediaFolder(MEDIA_FOLDER, [], batchSize, 0);

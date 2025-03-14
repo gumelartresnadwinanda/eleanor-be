@@ -5,20 +5,21 @@ const knex = require("knex");
 const config = require("../knexfile");
 
 const db = knex(config.development);
-const MEDIA_FOLDER = process.env.MEDIA_OPTIMIZE_FOLDER;
-const SKIPPED_FILES_LOG = path.join(__dirname, "../output/skipped_files.json");
-const CHECK_RECURSIVE = process.env.MEDIA_RECURSIVE_CHECK === "true";
 
-async function updateCreatedDate(folderPath) {
+async function updateCreatedDate(folderPath, recursiveCheck) {
   let skippedFiles = [];
+  let updatedFiles = [];
+  let errorFiles = [];
 
   try {
     const files = await fs.readdir(folderPath, { withFileTypes: true });
     for (const file of files) {
       const filePath = path.join(folderPath, file.name);
-      if (file.isDirectory() && !!CHECK_RECURSIVE) {
-        console.log(`Processing subdirectory: ${filePath}`);
-        await updateCreatedDate(filePath); // Recursively process subdirectories
+      if (file.isDirectory()) {
+        if (file.name === "thumbnails") {
+          console.log(`Skipping directory: ${filePath}`);
+          continue;
+        }
       } else {
         const ext = path.extname(file.name).toLowerCase();
         if (ext === ".mp4") {
@@ -32,60 +33,46 @@ async function updateCreatedDate(folderPath) {
             await db("media")
               .where("file_path", filePath)
               .update({ created_at: createdAt })
+              .then(() => {
+                console.log(
+                  `Updated created_at for ${filePath} to ${createdAt}`
+                );
+                updatedFiles.push(filePath);
+              })
               .catch(() => {
-                console.error(`Error querying database for ${file.name}:`);
-                console.log(`No database record for ${file.name}, skipping...`);
-                skippedFiles.push(file.name);
+                console.error(`Error querying database for ${filePath}:`);
+                console.log(`No database record for ${filePath}, skipping...`);
+                skippedFiles.push(filePath);
                 return null;
               });
-            console.log(`Updated created_at for ${file.name} to ${createdAt}`);
           } catch (error) {
             if (error.code === "ENOENT") {
               console.log(
-                `No corresponding .MOV file for ${file.name}, skipping...`
+                `No corresponding .MOV file for ${filePath}, skipping...`
               );
+              skippedFiles.push(filePath);
             } else {
               console.error(`Error reading ${movFilePath}:`, error);
+              errorFiles.push({ file: filePath, error: error.message });
             }
           }
-        } else if (ext === ".jpg" || ext === ".jpeg" || ext === ".png") {
-          try {
-            const fileStat = await fs.stat(filePath);
-            const modifiedAt = fileStat.mtime;
-            await db("media")
-              .where("file_path", filePath)
-              .update({ created_at: modifiedAt })
-              .catch(() => {
-                console.error(`Error querying database for ${file.name}:`);
-                console.log(`No database record for ${file.name}, skipping...`);
-                skippedFiles.push(file.name);
-                return null;
-              });
-            console.log(`Updated created_at for ${file.name} to ${modifiedAt}`);
-          } catch (error) {
-            console.error(`Error reading ${filePath}:`, error);
-          }
+        } else {
+          console.log(`Skipping non-MOV file: ${filePath}`);
+          skippedFiles.push(filePath);
         }
       }
     }
   } catch (error) {
     console.error("Error updating created dates:", error);
   } finally {
-    if (skippedFiles.length > 0) {
-      try {
-        await fs.writeFile(
-          SKIPPED_FILES_LOG,
-          JSON.stringify(skippedFiles, null, 2)
-        );
-        console.log(`Skipped files saved to ${SKIPPED_FILES_LOG}`);
-      } catch (error) {
-        console.error("Error writing skipped files log:", error);
-      }
-    }
     await db.destroy();
   }
+
+  return {
+    updatedFiles,
+    skippedFiles,
+    errorFiles,
+  };
 }
 
-(async () => {
-  await updateCreatedDate(MEDIA_FOLDER);
-})();
+module.exports = { updateCreatedDate };
