@@ -19,6 +19,7 @@ router.get("/", checkToken, async (req, res) => {
       tags,
       match_all_tags = false,
       file_type,
+      is_protected,
     } = req.query;
     const offset = (page - 1) * limit;
 
@@ -26,6 +27,10 @@ router.get("/", checkToken, async (req, res) => {
     let query = db("media");
     if (!req.isAuthenticated) {
       query = query.where("is_protected", false);
+    } else {
+      if (is_protected !== undefined) {
+        query = query.where("is_protected", is_protected);
+      }
     }
 
     if (tags) {

@@ -26,7 +26,8 @@ async function populateTags(startId = 0) {
     const newTags = [...tagsSet].filter((tag) => !existingTagsSet.has(tag));
 
     for (const tag of newTags) {
-      await db("tags").insert({ name: tag });
+      // Insert new tags with is_hidden flag set to true to prevent them from being displayed before review
+      await db("tags").insert({ name: tag, is_hidden: true });
     }
 
     console.log("Tags populated successfully.");
@@ -53,7 +54,7 @@ router.post("/populate", checkToken, async (req, res) => {
 
 // Endpoint to get tags with pagination
 router.get("/", checkToken, async (req, res) => {
-  const { page = 1, limit = 20 } = req.query;
+  const { page = 1, limit = 20, is_protected, is_hidden = false } = req.query;
   const offset = (page - 1) * limit;
 
   try {
@@ -61,9 +62,13 @@ router.get("/", checkToken, async (req, res) => {
 
     if (!req.isAuthenticated) {
       query = query.where("is_protected", false);
+    } else {
+      if (is_protected !== undefined) {
+        query = query.where("is_protected", is_protected);
+      }
     }
 
-    query = query.where("is_hidden", false);
+    query = query.where("is_hidden", is_hidden);
 
     const tags = await query;
     const count = await query.count().first();
