@@ -2,6 +2,10 @@ const express = require("express");
 const { scanDirectories } = require("../utils/directory-scanner");
 const { processDirectory } = require("../utils/thumbnail-creator");
 const { updateCreatedDate } = require("../utils/update-created-date");
+const {
+  findMissingThumbnails,
+  findThumbnailsWithoutFile,
+} = require("../utils/thumbnail-finder");
 
 const router = express.Router();
 
@@ -94,6 +98,62 @@ router.post("/update-created-date", async (req, res) => {
     );
     res.status(500).json({
       error: "Failed to update created dates",
+      message: error.message,
+    });
+  }
+});
+
+router.post("/find-thumbnails", async (req, res) => {
+  const { directoryPath } = req.query;
+  if (!directoryPath || typeof directoryPath !== "string") {
+    return res.status(400).json({
+      error: "directoryPath query parameter is required and must be a string",
+    });
+  }
+
+  console.log(`Finding missing thumbnails in directory: ${directoryPath}`);
+
+  try {
+    const missingThumbnails = await findMissingThumbnails(directoryPath);
+    res.status(200).json({
+      message: "Thumbnail finding completed",
+      missingThumbnails,
+    });
+  } catch (error) {
+    console.error(
+      `Failed to find thumbnails for directory: ${directoryPath}`,
+      error
+    );
+    res.status(500).json({
+      error: "Failed to find thumbnails",
+      message: error.message,
+    });
+  }
+});
+
+router.post("/find-orphan-thumbnails", async (req, res) => {
+  const { directoryPath } = req.query;
+  if (!directoryPath || typeof directoryPath !== "string") {
+    return res.status(400).json({
+      error: "directoryPath query parameter is required and must be a string",
+    });
+  }
+
+  console.log(`Finding orphan thumbnails in directory: ${directoryPath}`);
+
+  try {
+    const orphanThumbnails = await findThumbnailsWithoutFile(directoryPath);
+    res.status(200).json({
+      message: "Orphan thumbnail finding completed",
+      orphanThumbnails,
+    });
+  } catch (error) {
+    console.error(
+      `Failed to find orphan thumbnails for directory: ${directoryPath}`,
+      error
+    );
+    res.status(500).json({
+      error: "Failed to find orphan thumbnails",
       message: error.message,
     });
   }
