@@ -96,8 +96,8 @@ async function optimizeVideo(filePath) {
           console.log(`Optimized video saved: ${outputFilePath}`);
           await fs.utimes(
             outputFilePath,
-            originalStat.birthtime,
-            originalStat.birthtime
+            originalStat.atime,
+            originalStat.mtime
           );
 
           await logResult(filePath, successLog);

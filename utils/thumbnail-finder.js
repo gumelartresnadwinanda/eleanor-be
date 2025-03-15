@@ -112,10 +112,19 @@ async function findThumbnailsWithoutFile(
 
           if (!fileExists) {
             orphanThumbnails.add(originalFilePath + ext.toUpperCase());
+            try {
+              await fs.unlink(filePath);
+              console.log(`Deleted orphan thumbnail: ${filePath}`);
+            } catch (error) {
+              console.error(
+                `Error deleting orphan thumbnail: ${filePath}`,
+                error
+              );
+            }
           }
         } catch (error) {
           if (error.code === "ENOENT") {
-            orphanThumbnails.add(filePath);
+            orphanThumbnails.add(originalFilePath + ext.toUpperCase());
           } else {
             console.error(
               `Error checking original file existence for thumbnail: ${filePath}`,

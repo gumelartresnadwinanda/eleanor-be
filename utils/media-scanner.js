@@ -129,13 +129,16 @@ function extractTagsFromPath(filePath) {
     .map((part) => part.toLowerCase());
 
   const fileName = path.basename(filePath, path.extname(filePath));
-  const firstTagFromFileName = fileName.includes("_")
-    ? fileName.split("_")[0].toLowerCase()
-    : null;
+  const firstTagFromFileName =
+    fileName.includes("_") && !fileName.includes("img_")
+      ? fileName.split("_")[0].toLowerCase()
+      : null;
 
-  return firstTagFromFileName
+  const allTags = firstTagFromFileName
     ? [...tagsFromPath, firstTagFromFileName]
     : tagsFromPath;
+
+  return [...new Set(allTags)];
 }
 
 async function processFile(filePath, mediaData) {
