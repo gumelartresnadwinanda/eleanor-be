@@ -60,7 +60,7 @@ router.get("/", checkToken, async (req, res) => {
     }
 
     // Add file_type filter
-    if (file_type) {
+    if (file_type && file_type !== "all") {
       query = query.where("file_type", file_type);
     }
 
