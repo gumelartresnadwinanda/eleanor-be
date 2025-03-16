@@ -52,31 +52,53 @@ router.post("/populate", checkToken, async (req, res) => {
   }
 });
 
-// Endpoint to get tags with pagination
+function buildTagsQuery(isAuthenticated, is_protected, is_hidden) {
+  let query = db("tags");
+
+  if (!isAuthenticated) {
+    query = query.where("is_protected", false);
+  } else {
+    if (is_protected !== undefined) {
+      query = query.where("is_protected", is_protected);
+    }
+  }
+
+  query = query.where("is_hidden", is_hidden);
+  return query;
+}
+
 router.get("/", checkToken, async (req, res) => {
-  const { page = 1, limit = 20, is_protected, is_hidden = false } = req.query;
+  const {
+    page = 1,
+    limit = 20,
+    is_protected,
+    is_hidden = false,
+    sort_by = "id",
+    sort_order = "asc",
+  } = req.query;
   const offset = (page - 1) * limit;
 
   try {
-    let query = db("tags").offset(offset).limit(limit);
-
-    if (!req.isAuthenticated) {
-      query = query.where("is_protected", false);
-    } else {
-      if (is_protected !== undefined) {
-        query = query.where("is_protected", is_protected);
-      }
-    }
-
-    query = query.where("is_hidden", is_hidden);
+    let query = buildTagsQuery(req.isAuthenticated, is_protected, is_hidden)
+      .offset(offset)
+      .limit(limit)
+      .orderBy(sort_by, sort_order);
 
     const tags = await query;
-    const count = await query.count().first();
+
+    const countQuery = buildTagsQuery(
+      req.isAuthenticated,
+      is_protected,
+      is_hidden
+    );
+    const count = await countQuery.count("* as count").first();
+
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
 
     res.json({ data: tags, next, prev, count: count.count });
   } catch (error) {
+    console.error("Error fetching tags:", error);
     res.status(500).json({ error: "Failed to fetch tags" });
   }
 });

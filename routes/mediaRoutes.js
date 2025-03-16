@@ -15,11 +15,12 @@ router.get("/", checkToken, async (req, res) => {
     const {
       page = 1,
       limit = 10,
-      is_random = false,
       tags,
       match_all_tags = false,
       file_type,
       is_protected,
+      sort_by = "created_at",
+      sort_order = "desc",
     } = req.query;
     const offset = (page - 1) * limit;
 
@@ -65,11 +66,7 @@ router.get("/", checkToken, async (req, res) => {
 
     // Apply sorting, randomization, or pagination
     const countQuery = query.clone();
-    if (is_random === "true") {
-      query = query.orderByRaw("RANDOM()");
-    } else {
-      query = query.orderBy("created_at", "desc").offset(offset).limit(limit);
-    }
+    query = query.orderBy(sort_by, sort_order).offset(offset).limit(limit);
 
     // Execute the query and send the response
     const medias = await query;
