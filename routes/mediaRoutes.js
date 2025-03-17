@@ -3,6 +3,7 @@ const express = require("express");
 const db = require("../db/connection");
 const checkToken = require("../middleware/authMiddleware");
 const mediaFields = require("../constants/mediaFields");
+const fs = require("fs").promises;
 
 const router = express.Router();
 
@@ -25,7 +26,7 @@ router.get("/", checkToken, async (req, res) => {
     const offset = (page - 1) * limit;
 
     // Build the query to fetch media
-    let query = db("media");
+    let query = db("media").whereNull("deleted_at");
     if (!req.isAuthenticated) {
       query = query.where("is_protected", false);
     } else {
@@ -214,7 +215,9 @@ router.delete("/batch", checkToken, async (req, res) => {
     await db.transaction(async (trx) => {
       for (const media of mediaData) {
         try {
-          await trx("media").where({ file_path: media.file_path }).del();
+          await trx("media")
+            .where({ file_path: media.file_path })
+            .update({ deleted_at: new Date() });
         } catch (error) {
           failedDeletes.push({
             file_path: media.file_path,
@@ -367,6 +370,44 @@ router.put("/batch/protected", checkToken, async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ error: "Failed to update batch protection status" });
+  }
+});
+
+// GET route to check all file paths and return missing files
+router.get("/check-files", checkToken, async (req, res) => {
+  const { deleteMissing = false } = req.query;
+
+  try {
+    const mediaFiles = await db("media").select("file_path");
+    const missingFiles = [];
+
+    for (const media of mediaFiles) {
+      try {
+        await fs.access(media.file_path);
+      } catch (error) {
+        if (error.code === "ENOENT") {
+          missingFiles.push(media.file_path);
+          if (deleteMissing === "true") {
+            await db("media")
+              .where("file_path", media.file_path)
+              .update({ deleted_at: new Date() });
+            console.log(
+              `Soft deleted database entry for missing file: ${media.file_path}`
+            );
+          }
+        } else {
+          console.error(`Error checking file: ${media.file_path}`, error);
+        }
+      }
+    }
+
+    res.status(200).json({
+      message: "File check completed",
+      missingFiles,
+    });
+  } catch (error) {
+    console.error("Error checking files:", error);
+    res.status(500).json({ error: "Failed to check files" });
   }
 });
 

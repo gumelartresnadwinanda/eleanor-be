@@ -10,6 +10,7 @@ async function populateTags(startId = 0) {
   try {
     const mediaRecords = await db("media")
       .where("id", ">=", startId)
+      .whereNull("deleted_at")
       .select("tags");
 
     const tagsSet = new Set();
@@ -80,6 +81,7 @@ router.get("/", checkToken, async (req, res) => {
 
   try {
     let query = buildTagsQuery(req.isAuthenticated, is_protected, is_hidden)
+      .whereNull("deleted_at")
       .offset(offset)
       .limit(limit)
       .orderBy(sort_by, sort_order);
@@ -100,6 +102,38 @@ router.get("/", checkToken, async (req, res) => {
   } catch (error) {
     console.error("Error fetching tags:", error);
     res.status(500).json({ error: "Failed to fetch tags" });
+  }
+});
+
+// GET route to check all tags and apply soft deletion if not used in media
+router.get("/check-tags", checkToken, async (req, res) => {
+  try {
+    const tags = await db("tags").select("name").orderBy("name", "asc");
+    const tagsToDelete = [];
+
+    for (const tag of tags) {
+      const mediaCount = await db("media")
+        .whereRaw("LOWER(tags) LIKE ?", [`%${tag.name.toLowerCase()}%`])
+        .whereNull("deleted_at")
+        .count()
+        .first();
+
+      if (mediaCount.count === 0 || mediaCount.count === "0") {
+        tagsToDelete.push(tag.name);
+        await db("tags")
+          .where("name", tag.name)
+          .update({ deleted_at: new Date() });
+        console.log(`Soft deleted tag: ${tag.name}`);
+      }
+    }
+
+    res.status(200).json({
+      message: "Tag check completed",
+      tagsToDelete,
+    });
+  } catch (error) {
+    console.error("Error checking tags:", error);
+    res.status(500).json({ error: "Failed to check tags" });
   }
 });
 
