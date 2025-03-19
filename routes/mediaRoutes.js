@@ -378,7 +378,9 @@ router.get("/check-files", checkToken, async (req, res) => {
   const { deleteMissing = false } = req.query;
 
   try {
-    const mediaFiles = await db("media").select("file_path");
+    const mediaFiles = await db("media")
+      .select("file_path")
+      .whereNull("deleted_at");
     const missingFiles = [];
 
     for (const media of mediaFiles) {
