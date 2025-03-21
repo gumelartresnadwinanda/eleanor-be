@@ -118,12 +118,18 @@ router.get("/check-tags", checkToken, async (req, res) => {
         .first();
 
       if (mediaCount.count === 0 || mediaCount.count === "0") {
-        tagsToDelete.push(tag.name);
-        await db("tags")
+        const tagRecord = await db("tags")
           .where("name", tag.name)
           .whereNull("deleted_at")
-          .update({ deleted_at: new Date() });
-        console.log(`Soft deleted tag: ${tag.name}`);
+          .first();
+
+        if (tagRecord) {
+          tagsToDelete.push(tag.name);
+          await db("tags")
+            .where("id", tagRecord.id)
+            .update({ deleted_at: new Date() });
+          console.log(`Soft deleted tag: ${tag.name}`);
+        }
       }
     }
 
