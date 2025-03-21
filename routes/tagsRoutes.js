@@ -27,8 +27,7 @@ async function populateTags(startId = 0) {
     const newTags = [...tagsSet].filter((tag) => !existingTagsSet.has(tag));
 
     for (const tag of newTags) {
-      // Insert new tags with is_hidden flag set to true to prevent them from being displayed before review
-      await db("tags").insert({ name: tag, is_hidden: true });
+      await db("tags").insert({ name: tag, is_protected: true });
     }
 
     console.log("Tags populated successfully.");
