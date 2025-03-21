@@ -24,7 +24,7 @@ const db = knex(config.development);
 
 // Supported file extensions (added .mov and .cr2)
 const VIDEO_EXTENSIONS = [".mp4", ".mkv"];
-const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png"];
+const PHOTO_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp"];
 const MUSIC_EXTENSIONS = [".mp3"];
 const DOCUMENT_EXTENSIONS = [".pdf"];
 // const RAW_EXTENSIONS = [".cr2"]; //skip for now since it's not supported when generating thumbnails

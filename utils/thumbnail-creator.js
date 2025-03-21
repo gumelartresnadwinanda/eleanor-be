@@ -53,7 +53,12 @@ async function processDirectory(directoryPath) {
     try {
       console.log(`====================`);
       console.log(`Generating thumbnail for file: ${filePath}`);
-      if (ext === ".jpg" || ext === ".jpeg" || ext === ".png") {
+      if (
+        ext === ".jpg" ||
+        ext === ".jpeg" ||
+        ext === ".png" ||
+        ext === ".webp"
+      ) {
         await generateImageThumbnail(filePath, thumbnailPath);
         results.success.push(file);
       } else if (ext === ".mp4" || ext === ".avi" || ext === ".mkv") {

@@ -83,6 +83,7 @@ async function findThumbnailsWithoutFile(
             ".mp4",
             ".avi",
             ".mkv",
+            ".webp",
           ];
           let fileExists = false;
 
