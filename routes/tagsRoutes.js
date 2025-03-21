@@ -121,6 +121,7 @@ router.get("/check-tags", checkToken, async (req, res) => {
         tagsToDelete.push(tag.name);
         await db("tags")
           .where("name", tag.name)
+          .whereNull("deleted_at")
           .update({ deleted_at: new Date() });
         console.log(`Soft deleted tag: ${tag.name}`);
       }
