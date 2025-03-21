@@ -1,5 +1,6 @@
 require("dotenv").config();
-const fs = require("fs").promises;
+const fs = require("fs");
+const fsp = require("fs").promises;
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 const knex = require("knex");
@@ -79,7 +80,7 @@ async function extractMetadata(filePath) {
           return reject(err);
         }
         try {
-          const fileStat = await fs.stat(filePath);
+          const fileStat = await fsp.stat(filePath);
           resolve({
             title: path.basename(filePath, ext),
             duration: metadata.format.duration || null,
@@ -94,7 +95,7 @@ async function extractMetadata(filePath) {
     });
   } else if ([...PHOTO_EXTENSIONS].includes(ext)) {
     try {
-      const fileStat = await fs.stat(filePath);
+      const fileStat = await fsp.stat(filePath);
       return {
         title: path.basename(filePath, ext),
         duration: null,
@@ -147,12 +148,26 @@ async function processFile(filePath, mediaData) {
         `thumb_${path.basename(filePath, ext)}.jpg`
       );
 
+      const generateThumbnailPath = (suffix) =>
+        thumbnailPath.replace(".jpg", `_${suffix}.jpg`);
+
+      const thumbnailMd = fs.existsSync(generateThumbnailPath("md"))
+        ? generateThumbnailPath("md")
+        : "";
+      const thumbnailLg = fs.existsSync(generateThumbnailPath("lg"))
+        ? generateThumbnailPath("lg")
+        : "";
+
+      if (!fs.existsSync(thumbnailPath)) {
+        console.log(`Thumbnail not generated for file: ${filePath}`);
+      }
+
       const directoryTags = USE_DIRECTORY_TAGS
         ? extractTagsFromPath(filePath)
         : [];
-      const combinedTags = [
-        ...new Set([...directoryTags, ...(TAGS ? TAGS.split(",") : [])]),
-      ].join(",");
+      const combinedTags = Array.from(
+        new Set([...directoryTags, ...(TAGS ? TAGS.split(",") : [])])
+      ).join(",");
 
       const mediaEntry = {
         title: metadata.title,
@@ -160,9 +175,9 @@ async function processFile(filePath, mediaData) {
         file_type: metadata.file_type,
         duration: metadata.duration,
         tags: combinedTags,
-        thumbnail_path: thumbnailPath,
-        thumbnail_md: thumbnailPath.replace(".jpg", "_md.jpg"),
-        thumbnail_lg: thumbnailPath.replace(".jpg", "_lg.jpg"),
+        thumbnail_path: fs.existsSync(thumbnailPath) ? thumbnailPath : "",
+        thumbnail_md: thumbnailMd,
+        thumbnail_lg: thumbnailLg,
         created_at: metadata.created_at || new Date(),
         is_protected: MEDIA_IS_PROTECTED || false,
       };
@@ -191,7 +206,7 @@ async function logError(filePath, reason) {
   let errorLog = [];
 
   try {
-    const errorLogContent = await fs.readFile(errorLogPath, "utf8");
+    const errorLogContent = await fsp.readFile(errorLogPath, "utf8");
     errorLog = JSON.parse(errorLogContent);
   } catch (error) {
     if (error.code !== "ENOENT") {
@@ -202,7 +217,7 @@ async function logError(filePath, reason) {
   errorLog.push({ filePath, reason });
 
   try {
-    await fs.writeFile(errorLogPath, JSON.stringify(errorLog, null, 2));
+    await fsp.writeFile(errorLogPath, JSON.stringify(errorLog, null, 2));
   } catch (error) {
     console.error("Error writing to media_error.json:", error);
   }
@@ -217,7 +232,7 @@ async function scanMediaFolder(
 ) {
   try {
     // Read the media folder
-    const files = await fs.readdir(folderPath);
+    const files = await fsp.readdir(folderPath);
     const totalFiles = files.length;
     const totalBatches = Math.ceil(totalFiles / batchSize);
 
@@ -229,7 +244,7 @@ async function scanMediaFolder(
       await Promise.all(
         batchFiles.map(async (file) => {
           const filePath = path.join(folderPath, file);
-          const stat = await fs.stat(filePath);
+          const stat = await fsp.stat(filePath);
 
           if (stat.isDirectory()) {
             if (file.toLowerCase() === "thumbnails") {
