@@ -21,18 +21,34 @@ async function populateTags(startId = 0) {
       }
     });
 
-    const existingTags = await db("tags").select("name");
-    const existingTagsSet = new Set(existingTags.map((tag) => tag.name));
+    const existingTags = await db("tags").select("name", "deleted_at");
+    const existingTagsMap = new Map(
+      existingTags.map((tag) => [tag.name, tag.deleted_at])
+    );
 
-    const newTags = [...tagsSet].filter((tag) => !existingTagsSet.has(tag));
+    const newTags = [...tagsSet].filter((tag) => !existingTagsMap.has(tag));
+    let createdCount = 0;
+    let restoredCount = 0;
 
     for (const tag of newTags) {
       await db("tags").insert({ name: tag, is_protected: true });
+      createdCount++;
     }
 
-    console.log("Tags populated successfully.");
+    for (const tag of tagsSet) {
+      if (existingTagsMap.has(tag) && existingTagsMap.get(tag) !== null) {
+        await db("tags").where("name", tag).update({ deleted_at: null });
+        restoredCount++;
+      }
+    }
+
+    console.log(
+      `Tags populated successfully. Created: ${createdCount}, Restored: ${restoredCount}`
+    );
+    return { createdCount, restoredCount };
   } catch (error) {
     console.error("Error populating tags:", error);
+    throw error;
   }
 }
 
@@ -45,8 +61,12 @@ router.post("/populate", checkToken, async (req, res) => {
   const { startId = 0 } = req.body;
 
   try {
-    await populateTags(startId);
-    res.status(200).json({ message: "Tags populated successfully" });
+    const { createdCount, restoredCount } = await populateTags(startId);
+    res.status(200).json({
+      message: "Tags populated successfully",
+      createdCount,
+      restoredCount,
+    });
   } catch (error) {
     res.status(500).json({ error: "Failed to populate tags" });
   }
