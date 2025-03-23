@@ -3,6 +3,7 @@ const fs = require("fs").promises;
 const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 const express = require("express");
+const { generateVideoThumbnail } = require("./thumbnail-generator");
 
 const MEDIA_FOLDER = process.env.MEDIA_OPTIMIZE_FOLDER;
 
@@ -50,6 +51,11 @@ async function optimizeVideo(filePath) {
 
   const fileName = path.basename(filePath, ".MOV");
   const outputFilePath = path.join(path.dirname(filePath), `${fileName}.mp4`);
+  const thumbnailDir = path.join(path.dirname(filePath), "thumbnails");
+  if (!fs.existsSync(thumbnailDir)) {
+    await fs.mkdir(thumbnailDir);
+  }
+  const thumbnailPath = path.join(thumbnailDir, `thumb_${fileName}.jpg`);
   const successLog = path.join(path.dirname(filePath), "success.json");
   const failLog = path.join(path.dirname(filePath), "fail.json");
 
@@ -105,6 +111,21 @@ async function optimizeVideo(filePath) {
           optimizationStatus = optimizationStatus.filter(
             (status) => status.filePath !== filePath
           );
+
+          // Generate thumbnail for the optimized video
+          try {
+            console.log(
+              `Generating thumbnail for optimized video: ${outputFilePath}`
+            );
+            await generateVideoThumbnail(outputFilePath, thumbnailPath);
+            console.log(`Thumbnail generated: ${thumbnailPath}`);
+          } catch (thumbnailError) {
+            console.error(
+              `Error generating thumbnail for ${outputFilePath}:`,
+              thumbnailError
+            );
+          }
+
           console.log("--------------------------------------------------");
           resolve();
         })
@@ -141,8 +162,8 @@ async function scanAndOptimize(folderPath = MEDIA_FOLDER) {
       const stat = await fs.stat(filePath);
       console.log(`Processing: ${filePath}`);
       if (stat.isDirectory()) {
-        if (file.toLowerCase() === "optimized") {
-          console.log(`Skipping optimized directory: ${filePath}`);
+        if (file.toLowerCase() === "thumbnails") {
+          console.log(`Skipping thumbnails directory: ${filePath}`);
           console.log("--------------------------------------------------");
           continue;
         }
