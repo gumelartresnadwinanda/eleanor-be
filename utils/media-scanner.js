@@ -132,7 +132,7 @@ function extractTagsFromPath(filePath) {
   return tagsFromPath;
 }
 
-async function processFile(filePath, mediaData) {
+async function processFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (SUPPORTED_EXTENSIONS.includes(ext)) {
     console.log(`Processing file: ${filePath}`);
@@ -257,7 +257,7 @@ async function scanMediaFolder(
             }
           } else {
             try {
-              await processFile(filePath, mediaData);
+              await processFile(filePath);
             } catch (error) {
               console.error(`Error processing file: ${filePath}`, error);
             }
@@ -278,4 +278,12 @@ async function scanMediaFolder(
   }
 }
 
-scanMediaFolder(MEDIA_FOLDER, [], batchSize, 0);
+if (require.main === module) {
+  scanMediaFolder(MEDIA_FOLDER, [], batchSize, 0);
+}
+
+// Export the functions you need
+module.exports = {
+  processFile,
+  scanMediaFolder,
+};

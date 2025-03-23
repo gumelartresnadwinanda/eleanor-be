@@ -4,6 +4,7 @@ const path = require("path");
 const ffmpeg = require("fluent-ffmpeg");
 const express = require("express");
 const { generateVideoThumbnail } = require("./thumbnail-generator");
+const { processFile } = require("./media-scanner");
 
 const MEDIA_FOLDER = process.env.MEDIA_OPTIMIZE_FOLDER;
 
@@ -18,6 +19,10 @@ const port = 6002;
 
 let optimizationStatus = [];
 let optimizedVideos = [];
+let thumbnailStatus = [];
+let generatedThumbnails = 0;
+let dbInsertedVideos = [];
+let dbInsertCount = 0;
 
 // Function to log the result of the optimization process
 async function logResult(filePath, logPath, reason = null) {
@@ -52,7 +57,9 @@ async function optimizeVideo(filePath) {
   const fileName = path.basename(filePath, ".MOV");
   const outputFilePath = path.join(path.dirname(filePath), `${fileName}.mp4`);
   const thumbnailDir = path.join(path.dirname(filePath), "thumbnails");
-  if (!fs.existsSync(thumbnailDir)) {
+  try {
+    await fs.access(thumbnailDir);
+  } catch {
     await fs.mkdir(thumbnailDir);
   }
   const thumbnailPath = path.join(thumbnailDir, `thumb_${fileName}.jpg`);
@@ -119,11 +126,28 @@ async function optimizeVideo(filePath) {
             );
             await generateVideoThumbnail(outputFilePath, thumbnailPath);
             console.log(`Thumbnail generated: ${thumbnailPath}`);
+            generatedThumbnails++;
+            thumbnailStatus.push({
+              filePath: outputFilePath,
+              status: "generated",
+            });
+
+            // Insert the optimized video into the database
+            await processFile(outputFilePath);
+            console.log(
+              `Inserted optimized video into database: ${outputFilePath}`
+            );
+            dbInsertedVideos.push(outputFilePath);
+            dbInsertCount++;
           } catch (thumbnailError) {
             console.error(
-              `Error generating thumbnail for ${outputFilePath}:`,
+              `Error generating thumbnail or inserting into database for ${outputFilePath}:`,
               thumbnailError
             );
+            thumbnailStatus.push({
+              filePath: outputFilePath,
+              status: "failed",
+            });
           }
 
           console.log("--------------------------------------------------");
@@ -184,6 +208,10 @@ app.get("/status", (req, res) => {
     totalDoneOptimizing: optimizedVideos.length,
     optimizationStatus,
     optimizedVideos,
+    thumbnailStatus,
+    generatedThumbnails,
+    dbInsertedVideos,
+    dbInsertCount,
   });
 });
 
