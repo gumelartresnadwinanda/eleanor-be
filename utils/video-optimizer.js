@@ -97,11 +97,11 @@ async function optimizeVideo(filePath) {
           );
           if (existingIndex !== -1) {
             optimizationStatus[existingIndex].progress =
-              progress.percent.toFixed(2);
+              progress.percent?.toFixed(2);
           } else {
             optimizationStatus.push({
               filePath,
-              progress: progress.percent.toFixed(2),
+              progress: progress.percent?.toFixed(2),
             });
           }
         })
@@ -206,12 +206,12 @@ async function scanAndOptimize(folderPath = MEDIA_FOLDER) {
 app.get("/status", (req, res) => {
   res.json({
     totalDoneOptimizing: optimizedVideos.length,
+    generatedThumbnails,
+    dbInsertCount,
     optimizationStatus,
     optimizedVideos,
     thumbnailStatus,
-    generatedThumbnails,
     dbInsertedVideos,
-    dbInsertCount,
   });
 });
 

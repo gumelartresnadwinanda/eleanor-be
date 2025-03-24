@@ -151,12 +151,20 @@ async function processFile(filePath) {
       const generateThumbnailPath = (suffix) =>
         thumbnailPath.replace(".jpg", `_${suffix}.jpg`);
 
-      const thumbnailMd = fs.existsSync(generateThumbnailPath("md"))
-        ? generateThumbnailPath("md")
-        : "";
-      const thumbnailLg = fs.existsSync(generateThumbnailPath("lg"))
-        ? generateThumbnailPath("lg")
-        : "";
+      let thumbnailMd = "";
+      let thumbnailLg = "";
+
+      if (metadata.file_type === "video") {
+        thumbnailMd = generateThumbnailPath("md");
+        thumbnailLg = generateThumbnailPath("lg");
+      } else {
+        thumbnailMd = fs.existsSync(generateThumbnailPath("md"))
+          ? generateThumbnailPath("md")
+          : "";
+        thumbnailLg = fs.existsSync(generateThumbnailPath("lg"))
+          ? generateThumbnailPath("lg")
+          : "";
+      }
 
       if (!fs.existsSync(thumbnailPath)) {
         console.log(`Thumbnail not generated for file: ${filePath}`);
