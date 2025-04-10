@@ -136,6 +136,52 @@ Run the script:
 yarn scan-directories
 ```
 
+## Albums
+
+### Album Management
+
+Albums allow you to group media files into collections. Each album can have metadata such as:
+
+- **Cover URL**: The primary cover image for the album.
+- **Fallback Cover URL**: A secondary cover image to use if the primary is unavailable.
+- **Online Album URLs**: A list of external URLs referencing the album, stored as a JSON array.
+- **Tags**: Metadata tags for categorization.
+- **Ownership Information**: The owner of the album.
+
+### API Endpoints
+
+- **Fetch Media in an Album**: `/medias/albums/:albumId/media`
+  - Includes `fallback_cover_url` and `online_album_urls` in the album metadata.
+- **Fetch Albums in a Playlist**: `/playlists/:playlistId/albums`
+  - Includes `fallback_cover_url` and `online_album_urls` in the album metadata.
+
+## Favorite Albums
+
+### Favorite Albums Management
+
+Users can mark albums as their favorites. The following API endpoints are available for managing favorite albums:
+
+### API Endpoints
+
+- **Fetch Favorite Albums**: `/medias/favorites`
+
+  - Query Parameters:
+    - `user_identifier` (required): The identifier for the user (e.g., username or email).
+  - Response: A list of favorite albums for the user.
+
+- **Add Album to Favorites**: `/medias/favorites` (POST)
+
+  - Body:
+    - `user_identifier` (required): The identifier for the user.
+    - `album_id` (required): The ID of the album to add to favorites.
+  - Response: Confirmation message.
+
+- **Remove Album from Favorites**: `/medias/favorites` (DELETE)
+  - Body:
+    - `user_identifier` (required): The identifier for the user.
+    - `album_id` (required): The ID of the album to remove from favorites.
+  - Response: Confirmation message.
+
 ## License
 
 This project is licensed under the MIT License.

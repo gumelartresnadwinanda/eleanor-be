@@ -4,7 +4,8 @@ const db = require("../db/connection");
 const checkToken = require("../middleware/authMiddleware");
 
 const router = express.Router();
-
+const SERVER_PORT = process.env.SERVER_PORT || 5002;
+const SERVER_URL = process.env.SERVER_URL || "http://localhost";
 // Function to populate tags from media table
 async function populateTags(startId = 0) {
   try {
@@ -95,6 +96,7 @@ router.get("/", checkToken, async (req, res) => {
     is_hidden = false,
     sort_by = "id",
     sort_order = "asc",
+    check_media = false,
   } = req.query;
   const offset = (page - 1) * limit;
 
@@ -106,6 +108,34 @@ router.get("/", checkToken, async (req, res) => {
       .orderBy(sort_by, sort_order);
 
     const tags = await query;
+
+    if (check_media) {
+      for (const tag of tags) {
+        const media = await db("media")
+          .whereRaw(
+            "LOWER(tags) LIKE ? OR LOWER(tags) LIKE ? OR LOWER(tags) LIKE ?",
+            [
+              `%,${tag.name.toLowerCase()},%`,
+              `${tag.name.toLowerCase()},%`,
+              `%,${tag.name.toLowerCase()}`,
+            ]
+          )
+          .whereNull("deleted_at")
+          .orderBy("id", "desc")
+          .first();
+
+        if (media) {
+          tag.last_media = `${SERVER_URL}:${SERVER_PORT}/file/${
+            media.thumbnail_md ||
+            media.thumbnail_path ||
+            media.file_path ||
+            null
+          }`;
+        } else {
+          tag.last_media = null;
+        }
+      }
+    }
 
     const countQuery = buildTagsQuery(
       req.isAuthenticated,

@@ -169,6 +169,45 @@ router.get("/:playlistId/media", checkToken, async (req, res) => {
   }
 });
 
+// GET route to fetch albums included in a playlist
+router.get("/:playlistId/albums", checkToken, async (req, res) => {
+  const { playlistId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  const offset = (page - 1) * limit;
+
+  try {
+    const albumsQuery = db("albums")
+      .join("playlist_media", "albums.id", "playlist_media.media_id")
+      .where("playlist_media.playlist_id", playlistId)
+      .select(
+        "albums.id",
+        "albums.title",
+        "albums.cover_url",
+        "albums.fallback_cover_url", // Include fallback cover URL
+        "albums.online_album_urls", // Include online album URLs
+        "albums.is_protected",
+        "albums.is_hidden",
+        "albums.created_at",
+        "albums.updated_at"
+      )
+      .offset(offset)
+      .limit(limit);
+
+    const albums = await albumsQuery;
+    const count = await db("playlist_media")
+      .where("playlist_id", playlistId)
+      .count()
+      .first();
+
+    const next = page * limit < count.count ? page + 1 : null;
+    const prev = page > 1 ? page - 1 : null;
+
+    res.json({ data: albums, next, prev, count: count.count });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch albums for the playlist" });
+  }
+});
+
 // POST route to add media to a playlist
 router.post("/:playlistId/media", checkToken, async (req, res) => {
   if (!req.isAuthenticated) {

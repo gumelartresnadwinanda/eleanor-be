@@ -413,4 +413,106 @@ router.get("/check-files", checkToken, async (req, res) => {
   }
 });
 
+// GET route to fetch media included in an album
+router.get("/albums/:albumId/media", checkToken, async (req, res) => {
+  const { albumId } = req.params;
+  const { page = 1, limit = 10 } = req.query;
+  const offset = (page - 1) * limit;
+
+  try {
+    const album = await db("albums").where("id", albumId).first();
+    if (!album) {
+      return res.status(404).json({ error: "Album not found" });
+    }
+
+    const mediaQuery = db("media")
+      .join("album_media", "media.id", "album_media.media_id")
+      .where("album_media.album_id", albumId)
+      .select("media.*")
+      .offset(offset)
+      .limit(limit);
+
+    const media = await mediaQuery;
+    const count = await db("album_media")
+      .where("album_id", albumId)
+      .count()
+      .first();
+
+    const next = page * limit < count.count ? page + 1 : null;
+    const prev = page > 1 ? page - 1 : null;
+
+    res.json({
+      album: {
+        id: album.id,
+        title: album.title,
+        cover_url: album.cover_url,
+        fallback_cover_url: album.fallback_cover_url, // Include fallback cover URL
+        online_album_urls: album.online_album_urls, // Include online album URLs
+      },
+      media,
+      next,
+      prev,
+      count: count.count,
+    });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch media for the album" });
+  }
+});
+
+// GET route to fetch favorite albums for a user
+router.get("/favorites", checkToken, async (req, res) => {
+  const { user_identifier } = req.query;
+
+  if (!user_identifier) {
+    return res.status(400).json({ error: "User identifier is required" });
+  }
+
+  try {
+    const favorites = await db("favorite_albums")
+      .join("albums", "favorite_albums.album_id", "albums.id")
+      .where("favorite_albums.user_identifier", user_identifier)
+      .select("albums.*");
+
+    res.status(200).json({ data: favorites });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to fetch favorite albums" });
+  }
+});
+
+// POST route to add an album to a user's favorites
+router.post("/favorites", checkToken, async (req, res) => {
+  const { user_identifier, album_id } = req.body;
+
+  if (!user_identifier || !album_id) {
+    return res
+      .status(400)
+      .json({ error: "User identifier and album ID are required" });
+  }
+
+  try {
+    await db("favorite_albums").insert({ user_identifier, album_id });
+    res.status(201).json({ message: "Album added to favorites" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to add album to favorites" });
+  }
+});
+
+// DELETE route to remove an album from a user's favorites
+router.delete("/favorites", checkToken, async (req, res) => {
+  const { user_identifier, album_id } = req.body;
+
+  if (!user_identifier || !album_id) {
+    return res
+      .status(400)
+      .json({ error: "User identifier and album ID are required" });
+  }
+
+  try {
+    await db("favorite_albums").where({ user_identifier, album_id }).del();
+    res.status(200).json({ message: "Album removed from favorites" });
+  } catch (err) {
+    res.status(500).json({ error: "Failed to remove album from favorites" });
+  }
+});
+
 module.exports = router;
