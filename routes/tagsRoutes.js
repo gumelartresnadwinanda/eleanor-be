@@ -73,7 +73,7 @@ router.post("/populate", checkToken, async (req, res) => {
   }
 });
 
-function buildTagsQuery(isAuthenticated, is_protected, is_hidden) {
+function buildTagsQuery(isAuthenticated, is_protected, is_hidden, type) {
   let query = db("tags");
 
   if (!isAuthenticated) {
@@ -82,6 +82,12 @@ function buildTagsQuery(isAuthenticated, is_protected, is_hidden) {
     if (is_protected !== undefined) {
       query = query.where("is_protected", is_protected);
     }
+  }
+
+  if (type) {
+    query = query.where((builder) => {
+      builder.where("type", type).orWhere("type", null);
+    });
   }
 
   query = query.where("is_hidden", is_hidden);
@@ -97,11 +103,17 @@ router.get("/", checkToken, async (req, res) => {
     sort_by = "id",
     sort_order = "asc",
     check_media = false,
+    type,
   } = req.query;
   const offset = (page - 1) * limit;
 
   try {
-    let query = buildTagsQuery(req.isAuthenticated, is_protected, is_hidden)
+    let query = buildTagsQuery(
+      req.isAuthenticated,
+      is_protected,
+      is_hidden,
+      type
+    )
       .whereNull("deleted_at")
       .offset(offset)
       .limit(limit)
@@ -110,20 +122,37 @@ router.get("/", checkToken, async (req, res) => {
     const tags = await query;
 
     if (check_media) {
-      for (const tag of tags) {
-        const media = await db("media")
-          .whereRaw(
-            "LOWER(tags) LIKE ? OR LOWER(tags) LIKE ? OR LOWER(tags) LIKE ?",
-            [
-              `%,${tag.name.toLowerCase()},%`,
-              `${tag.name.toLowerCase()},%`,
-              `%,${tag.name.toLowerCase()}`,
-            ]
-          )
-          .whereNull("deleted_at")
-          .orderBy("id", "desc")
-          .first();
+      // Fetch the most recent media for all tags in a single query
+      const tagNames = tags.map((tag) => tag.name.toLowerCase());
+      const mediaRecords = await db("media")
+        .select("tags", "thumbnail_md", "thumbnail_path", "file_path")
+        .whereNull("deleted_at")
+        .where((builder) => {
+          tagNames.forEach((tagName) => {
+            builder.orWhereRaw(
+              "LOWER(tags) LIKE ? OR LOWER(tags) LIKE ? OR LOWER(tags) LIKE ?",
+              [`%,${tagName},%`, `${tagName},%`, `%,${tagName}`]
+            );
+          });
+        })
+        .orderBy("id", "desc");
 
+      // Map the most recent media to each tag
+      const mediaMap = {};
+      for (const media of mediaRecords) {
+        const mediaTags = media.tags.toLowerCase().split(",");
+        for (const tagName of tagNames) {
+          if (mediaTags.includes(tagName)) {
+            if (!mediaMap[tagName]) {
+              mediaMap[tagName] = media;
+            }
+          }
+        }
+      }
+
+      // Assign the most recent media to each tag
+      for (const tag of tags) {
+        const media = mediaMap[tag.name.toLowerCase()];
         if (media) {
           tag.last_media = `${SERVER_URL}:${SERVER_PORT}/file/${
             media.thumbnail_md ||
