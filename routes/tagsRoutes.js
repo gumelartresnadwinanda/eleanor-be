@@ -183,6 +183,38 @@ router.get("/", checkToken, async (req, res) => {
   }
 });
 
+router.get("/detail/:tag", checkToken, async (req, res) => {
+  const { tag } = req.params;
+  const { is_protected } = req.query;
+
+  try {
+    const tagDetails = await db("tags")
+      .where("name", tag)
+      .whereNull("deleted_at")
+      .first();
+
+    if (!tagDetails) {
+      return res.status(404).json({ error: "Tag not found" });
+    }
+
+    const recommendations = await db("tags")
+      .where("type", tagDetails.type)
+      .where("name", "!=", tag)
+      .where("is_protected", is_protected || false)
+      .where("is_hidden", false)
+      .whereNull("deleted_at")
+      .limit(20);
+
+    res.status(200).json({
+      tag: tagDetails,
+      recommendations,
+    });
+  } catch (error) {
+    console.error("Error fetching tag details:", error);
+    res.status(500).json({ error: "Failed to fetch tag details" });
+  }
+});
+
 // GET route to check all tags and apply soft deletion if not used in media
 router.get("/check-tags", checkToken, async (req, res) => {
   try {
