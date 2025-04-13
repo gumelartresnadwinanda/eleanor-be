@@ -249,16 +249,31 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
             ]
           : []),
       ];
-      console.log("fallbackConditions", fallbackConditions);
-      const fallbackQuery = db("media_tags")
-        .select("tag_name as tag")
-        .count("* as usage_count")
-        .join("tags", "media_tags.tag_name", "tags.name")
-        .select("tags.type")
-        .groupBy("tag_name", "tags.type")
+      const fallbackQuery = db("media_tags as mt")
+        .select(
+          "mt.tag_name as tag",
+          db.raw("count(*) as usage_count"),
+          "tags.type",
+          db.raw(`(
+            select m.thumbnail_path
+            from media as m
+            where m.id = mt.media_id and m.deleted_at is null
+            order by m.id desc
+            limit 1
+          ) as thumbnail_path`),
+          db.raw(`(
+            select m.file_path
+            from media as m
+            where m.id = mt.media_id and m.deleted_at is null
+            order by m.id desc
+            limit 1
+          ) as file_path`)
+        )
+        .join("tags", "mt.tag_name", "tags.name")
+        .join("media", "mt.media_id", "media.id")
+        .groupBy("mt.tag_name", "tags.type", "mt.media_id")
         .orderBy("usage_count", "desc")
         .limit(10);
-
       const fallback = await buildQuery(fallbackQuery, fallbackConditions);
       recommendations = fallback;
     } else {
@@ -286,7 +301,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'stage' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "stage")
           .whereIn("mt.media_id", function () {
@@ -308,7 +325,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'person' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "person")
           .whereIn("mt.media_id", function () {
@@ -329,7 +348,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'album' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "album")
           .whereIn("mt.media_id", function () {
@@ -359,7 +380,7 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
               .orderBy("m2.id", "desc")
               .limit(1)
           )
-          .groupBy("t.name", "m.thumbnail_path")
+          .groupBy("t.name", "m.file_path")
           .limit(10);
 
         const sharedAlbumRecommendations = await buildQuery(
@@ -379,7 +400,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'album' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "album")
           .whereIn("mt.media_id", function () {
@@ -410,7 +433,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'stage' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "stage")
           .whereIn("mt.media_id", function () {
@@ -443,7 +468,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'person' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "person")
           .whereIn("mt.media_id", function () {
@@ -474,7 +501,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
           .select(
             "t.name as tag",
             db.raw("'album' as type"),
-            "m.thumbnail_path"
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
           )
           .where("t.type", "album")
           .whereIn("mt.media_id", function () {
@@ -503,10 +532,9 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
       }
     }
     res.status(200).json({
+      data: recommendations,
+      count: recommendations.length || 0,
       message: "Recommendation success",
-      type: tagType,
-      tag: tagName,
-      recommendations,
     });
   } catch (error) {
     console.error("Error fetching recommendations:", error);
