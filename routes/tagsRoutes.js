@@ -104,6 +104,7 @@ router.get("/", checkToken, async (req, res) => {
     sort_order = "asc",
     check_media = false,
     type,
+    popularity = false,
   } = req.query;
   const offset = (page - 1) * limit;
 
@@ -113,11 +114,22 @@ router.get("/", checkToken, async (req, res) => {
       is_protected,
       is_hidden,
       type
-    )
-      .whereNull("deleted_at")
-      .offset(offset)
-      .limit(limit)
-      .orderBy(sort_by, sort_order);
+    ).whereNull("deleted_at");
+
+    if (popularity === "true" || popularity === true) {
+      query = query
+        .select(
+          "tags.*",
+          db.raw(
+            "(SELECT COUNT(*) FROM media_tags WHERE tag_name = tags.name) as media_count"
+          )
+        )
+        .orderBy("media_count", sort_order === "asc" ? "asc" : "desc");
+    } else {
+      query = query.orderBy(sort_by, sort_order);
+    }
+
+    query = query.offset(offset).limit(limit);
 
     const tags = await query;
 
