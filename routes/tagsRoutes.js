@@ -188,8 +188,9 @@ router.get("/", checkToken, async (req, res) => {
     const countQuery = buildTagsQuery(
       req.isAuthenticated,
       is_protected,
-      is_hidden
-    );
+      is_hidden,
+      type
+    ).whereNull("deleted_at");
     const count = await countQuery.count("* as count").first();
 
     const next = page * limit < count.count ? page + 1 : null;
