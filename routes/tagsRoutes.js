@@ -524,6 +524,7 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
         uniqueMap.set(item.tag, {
           ...item,
           id: item.tag,
+          name: item.tag,
           last_media: `${SERVER_URL}:${SERVER_PORT}/file/${
             item.thumbnail_path || item.thumbnail_md || item.file_path
           }`,
