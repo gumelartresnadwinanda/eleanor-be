@@ -6,6 +6,7 @@ const {
   findMissingThumbnails,
   findThumbnailsWithoutFile,
 } = require("../utils/thumbnail-finder");
+const { connectToRedis, isRedisAvailable } = require("../config/redis");
 
 const router = express.Router();
 
@@ -156,6 +157,21 @@ router.post("/find-orphan-thumbnails", async (req, res) => {
       error: "Failed to find orphan thumbnails",
       message: error.message,
     });
+  }
+});
+
+router.get("/reconnect-redis", async (req, res) => {
+  if (isRedisAvailable) {
+    return res.json({ message: "Redis is already connected." });
+  }
+
+  try {
+    await connectToRedis();
+    res.json({ message: `successfully retried` });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ message: "Redis reconnect failed", error: err.message });
   }
 });
 

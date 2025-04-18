@@ -2,6 +2,7 @@ require("dotenv").config();
 const express = require("express");
 const db = require("../db/connection");
 const checkToken = require("../middleware/authMiddleware");
+const cacheMiddleware = require("../middleware/cacheMiddleware");
 
 const router = express.Router();
 const SERVER_PORT = process.env.SERVER_PORT || 5002;
@@ -94,7 +95,7 @@ function buildTagsQuery(isAuthenticated, is_protected, is_hidden, type) {
   return query;
 }
 
-router.get("/", checkToken, async (req, res) => {
+router.get("/", checkToken, cacheMiddleware, async (req, res) => {
   const {
     page = 1,
     limit = 20,
@@ -203,7 +204,7 @@ router.get("/", checkToken, async (req, res) => {
   }
 });
 
-router.get("/detail/:tag", checkToken, async (req, res) => {
+router.get("/detail/:tag", checkToken, cacheMiddleware, async (req, res) => {
   const { tag } = req.params;
 
   try {
@@ -225,46 +226,50 @@ router.get("/detail/:tag", checkToken, async (req, res) => {
   }
 });
 
-router.get("/recommendations/:tagName", checkToken, async (req, res) => {
-  const { tagName } = req.params;
-  const { is_protected } = req.query;
+router.get(
+  "/recommendations/:tagName",
+  cacheMiddleware,
+  checkToken,
+  async (req, res) => {
+    const { tagName } = req.params;
+    const { is_protected } = req.query;
 
-  try {
-    const tagInfo = await db("tags").where("name", tagName).first();
-    let recommendations = [];
-    const tagType = tagInfo?.type || null;
+    try {
+      const tagInfo = await db("tags").where("name", tagName).first();
+      let recommendations = [];
+      const tagType = tagInfo?.type || null;
 
-    // Build query function that adds conditions dynamically
-    const buildQuery = (baseQuery, conditions) => {
-      conditions.forEach((condition) => {
-        baseQuery = baseQuery.where(
-          condition.column,
-          condition.operator,
-          condition.value
-        );
-      });
-      return baseQuery;
-    };
+      // Build query function that adds conditions dynamically
+      const buildQuery = (baseQuery, conditions) => {
+        conditions.forEach((condition) => {
+          baseQuery = baseQuery.where(
+            condition.column,
+            condition.operator,
+            condition.value
+          );
+        });
+        return baseQuery;
+      };
 
-    // If no tag info or tag type is null, return fallback recommendations
-    const fallbackConditions = [
-      { column: "tags.deleted_at", operator: "is", value: null },
-      { column: "tags.is_hidden", operator: "=", value: false },
-    ];
-    if (typeof is_protected !== "undefined") {
-      fallbackConditions.push({
-        column: "tags.is_protected",
-        operator: "=",
-        value: !req.isAuthenticated ? false : is_protected,
-      });
-    }
-    const fallbackQuery = db("tags").select(
-      "tags.name as tag",
-      db.raw(
-        "(SELECT COUNT(*) FROM media_tags WHERE tag_name = tags.name) as usage_count"
-      ),
-      "tags.type",
-      db.raw(`
+      // If no tag info or tag type is null, return fallback recommendations
+      const fallbackConditions = [
+        { column: "tags.deleted_at", operator: "is", value: null },
+        { column: "tags.is_hidden", operator: "=", value: false },
+      ];
+      if (typeof is_protected !== "undefined") {
+        fallbackConditions.push({
+          column: "tags.is_protected",
+          operator: "=",
+          value: !req.isAuthenticated ? false : is_protected,
+        });
+      }
+      const fallbackQuery = db("tags").select(
+        "tags.name as tag",
+        db.raw(
+          "(SELECT COUNT(*) FROM media_tags WHERE tag_name = tags.name) as usage_count"
+        ),
+        "tags.type",
+        db.raw(`
           (
             SELECT m.thumbnail_path
             FROM media m
@@ -275,274 +280,302 @@ router.get("/recommendations/:tagName", checkToken, async (req, res) => {
             LIMIT 1
           ) as thumbnail_path
         `)
-    );
-    const query = buildQuery(fallbackQuery, fallbackConditions)
-      .orderBy(db.raw("RANDOM()"))
-      .limit(10);
-    const fallback = await query;
-
-    const baseConditions = [
-      { column: "t.deleted_at", operator: "is", value: null },
-      { column: "t.is_hidden", operator: "!=", value: true },
-      { column: "t.name", operator: "!=", value: tagName },
-      ...(typeof is_protected !== "undefined"
-        ? [
-            {
-              column: "t.is_protected",
-              operator: "=",
-              value: !req.isAuthenticated ? false : is_protected,
-            },
-          ]
-        : []),
-    ];
-
-    // Recommendations when the tag type is "album"
-    if (tagType === "album") {
-      const stageQuery = db("media_tags as mt")
-        .join("tags as t", "mt.tag_name", "t.name")
-        .join("media as m", "mt.media_id", "m.id")
-        .distinctOn("t.name")
-        .select(
-          "t.name as tag",
-          db.raw("'stage' as type"),
-          "m.thumbnail_path",
-          "m.file_path",
-          "m.thumbnail_md"
-        )
-        .where("t.type", "stage")
-        .whereIn("mt.media_id", function () {
-          this.select("media_id").from("media_tags").where("tag_name", tagName);
-        })
-        .orderBy("t.name")
-        .limit(5);
-
-      const stageRecommendations = await buildQuery(stageQuery, baseConditions);
-
-      const personQuery = db("media_tags as mt")
-        .join("tags as t", "mt.tag_name", "t.name")
-        .join("media as m", "mt.media_id", "m.id")
-        .select(
-          "t.name as tag",
-          db.raw("'person' as type"),
-          "m.thumbnail_path",
-          "m.file_path",
-          "m.thumbnail_md"
-        )
-        .where("t.type", "person")
-        .whereIn("mt.media_id", function () {
-          this.select("media_id").from("media_tags").where("tag_name", tagName);
-        })
-        .limit(1);
-
-      const personRecommendations = await buildQuery(
-        personQuery,
-        baseConditions
       );
-
-      const sharedAlbumQuery = db("tags as t")
-        .join("media_tags as mt", "t.name", "mt.tag_name")
-        .join("media as m", "mt.media_id", "m.id")
-        .select(
-          "t.name as tag",
-          db.raw("'album' as type"),
-          "m.thumbnail_path",
-          "m.file_path",
-          "m.thumbnail_md"
-        )
-        .where("t.type", "album")
-        .whereIn("mt.media_id", function () {
-          this.select("media_id")
-            .from("media_tags")
-            .whereIn("tag_name", function () {
-              this.select("tag_name")
-                .from("media_tags as mt1")
-                .join("tags as t1", "mt1.tag_name", "t1.name")
-                .where(
-                  "mt1.media_id",
-                  "in",
-                  db("media_tags").select("media_id").where("tag_name", tagName)
-                )
-                .andWhere("t1.type", "person");
-            });
-        })
-        .andWhere(
-          "m.id",
-          "=",
-          db("media as m2")
-            .select("m2.id")
-            .join("media_tags as mt2", "m2.id", "mt2.media_id")
-            .whereRaw("mt2.tag_name = t.name")
-            .orderBy("m2.id", "desc")
-            .limit(1)
-        )
-        .groupBy("t.name", "m.thumbnail_path", "m.thumbnail_md", "m.file_path")
+      const query = buildQuery(fallbackQuery, fallbackConditions)
+        .orderBy(db.raw("RANDOM()"))
         .limit(10);
+      const fallback = await query;
 
-      const sharedAlbumRecommendations = await buildQuery(
-        sharedAlbumQuery,
-        baseConditions
-      );
-
-      recommendations = [
-        ...stageRecommendations,
-        ...personRecommendations,
-        ...sharedAlbumRecommendations,
-        ...fallback,
+      const baseConditions = [
+        { column: "t.deleted_at", operator: "is", value: null },
+        { column: "t.is_hidden", operator: "!=", value: true },
+        { column: "t.name", operator: "!=", value: tagName },
+        ...(typeof is_protected !== "undefined"
+          ? [
+              {
+                column: "t.is_protected",
+                operator: "=",
+                value: !req.isAuthenticated ? false : is_protected,
+              },
+            ]
+          : []),
       ];
-    } else if (tagType === "person") {
-      const albumQuery = db("tags as t")
-        .join("media_tags as mt", "t.name", "mt.tag_name")
-        .join("media as m", "mt.media_id", "m.id")
-        .select(
-          "t.name as tag",
-          db.raw("'album' as type"),
-          "m.thumbnail_path",
-          "m.file_path",
-          "m.thumbnail_md"
-        )
-        .where("t.type", "album")
-        .whereIn("mt.media_id", function () {
-          this.select("media_id").from("media_tags").where("tag_name", tagName);
-        })
-        .andWhere(
-          "m.id",
-          "=",
-          db("media as m2")
-            .select("m2.id")
-            .join("media_tags as mt2", "m2.id", "mt2.media_id")
-            .whereRaw("mt2.tag_name = t.name")
-            .orderBy("m2.id", "desc")
-            .limit(1)
-        )
-        .limit(10);
 
-      const albumRecommendations = await buildQuery(albumQuery, baseConditions);
-      const stageQuery = db("media_tags as mt1")
-        .join("tags as base_t", "mt1.tag_name", "base_t.name")
-        .join("media_tags as mt2", "mt1.media_id", "mt2.media_id")
-        .join("tags as t", "mt2.tag_name", "t.name")
-        .select(
-          "t.name as tag",
-          db.raw("'stage' as type"),
-          db.raw("COUNT(*) as cooccurrence_count"),
-          db.raw(`
+      // Recommendations when the tag type is "album"
+      if (tagType === "album") {
+        const stageQuery = db("media_tags as mt")
+          .join("tags as t", "mt.tag_name", "t.name")
+          .join("media as m", "mt.media_id", "m.id")
+          .distinctOn("t.name")
+          .select(
+            "t.name as tag",
+            db.raw("'stage' as type"),
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
+          )
+          .where("t.type", "stage")
+          .whereIn("mt.media_id", function () {
+            this.select("media_id")
+              .from("media_tags")
+              .where("tag_name", tagName);
+          })
+          .orderBy("t.name")
+          .limit(5);
+
+        const stageRecommendations = await buildQuery(
+          stageQuery,
+          baseConditions
+        );
+
+        const personQuery = db("media_tags as mt")
+          .join("tags as t", "mt.tag_name", "t.name")
+          .join("media as m", "mt.media_id", "m.id")
+          .select(
+            "t.name as tag",
+            db.raw("'person' as type"),
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
+          )
+          .where("t.type", "person")
+          .whereIn("mt.media_id", function () {
+            this.select("media_id")
+              .from("media_tags")
+              .where("tag_name", tagName);
+          })
+          .limit(1);
+
+        const personRecommendations = await buildQuery(
+          personQuery,
+          baseConditions
+        );
+
+        const sharedAlbumQuery = db("tags as t")
+          .join("media_tags as mt", "t.name", "mt.tag_name")
+          .join("media as m", "mt.media_id", "m.id")
+          .select(
+            "t.name as tag",
+            db.raw("'album' as type"),
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
+          )
+          .where("t.type", "album")
+          .whereIn("mt.media_id", function () {
+            this.select("media_id")
+              .from("media_tags")
+              .whereIn("tag_name", function () {
+                this.select("tag_name")
+                  .from("media_tags as mt1")
+                  .join("tags as t1", "mt1.tag_name", "t1.name")
+                  .where(
+                    "mt1.media_id",
+                    "in",
+                    db("media_tags")
+                      .select("media_id")
+                      .where("tag_name", tagName)
+                  )
+                  .andWhere("t1.type", "person");
+              });
+          })
+          .andWhere(
+            "m.id",
+            "=",
+            db("media as m2")
+              .select("m2.id")
+              .join("media_tags as mt2", "m2.id", "mt2.media_id")
+              .whereRaw("mt2.tag_name = t.name")
+              .orderBy("m2.id", "desc")
+              .limit(1)
+          )
+          .groupBy(
+            "t.name",
+            "m.thumbnail_path",
+            "m.thumbnail_md",
+            "m.file_path"
+          )
+          .limit(10);
+
+        const sharedAlbumRecommendations = await buildQuery(
+          sharedAlbumQuery,
+          baseConditions
+        );
+
+        recommendations = [
+          ...stageRecommendations,
+          ...personRecommendations,
+          ...sharedAlbumRecommendations,
+          ...fallback,
+        ];
+      } else if (tagType === "person") {
+        const albumQuery = db("tags as t")
+          .join("media_tags as mt", "t.name", "mt.tag_name")
+          .join("media as m", "mt.media_id", "m.id")
+          .select(
+            "t.name as tag",
+            db.raw("'album' as type"),
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
+          )
+          .where("t.type", "album")
+          .whereIn("mt.media_id", function () {
+            this.select("media_id")
+              .from("media_tags")
+              .where("tag_name", tagName);
+          })
+          .andWhere(
+            "m.id",
+            "=",
+            db("media as m2")
+              .select("m2.id")
+              .join("media_tags as mt2", "m2.id", "mt2.media_id")
+              .whereRaw("mt2.tag_name = t.name")
+              .orderBy("m2.id", "desc")
+              .limit(1)
+          )
+          .limit(10);
+
+        const albumRecommendations = await buildQuery(
+          albumQuery,
+          baseConditions
+        );
+        const stageQuery = db("media_tags as mt1")
+          .join("tags as base_t", "mt1.tag_name", "base_t.name")
+          .join("media_tags as mt2", "mt1.media_id", "mt2.media_id")
+          .join("tags as t", "mt2.tag_name", "t.name")
+          .select(
+            "t.name as tag",
+            db.raw("'stage' as type"),
+            db.raw("COUNT(*) as cooccurrence_count"),
+            db.raw(`
         (SELECT m.thumbnail_path FROM media m 
         JOIN media_tags mt ON m.id = mt.media_id
         WHERE mt.tag_name = t.name
         ORDER BY m.id DESC LIMIT 1) as thumbnail_path
       `)
-        )
-        .where("base_t.name", tagName)
-        .where("base_t.type", "person")
-        .where("t.type", "stage")
-        .whereNot("t.name", tagName)
-        .groupBy("t.name")
-        .orderBy("cooccurrence_count", "desc")
-        .limit(5);
-      const stageRecommendations = await buildQuery(stageQuery, baseConditions);
-      recommendations = [
-        ...albumRecommendations,
-        ...stageRecommendations,
-        ...fallback,
-      ];
-    } else if (tagType === "stage") {
-      const personQuery = db("media_tags as mt_stage") // Start with stage tag occurrences
-        .join(
-          "media_tags as mt_person",
-          "mt_stage.media_id",
-          "mt_person.media_id"
-        )
-        .join("tags as t", "mt_person.tag_name", "t.name")
-        .join("media as m", "mt_person.media_id", "m.id")
-        .select(
-          "t.name as tag",
-          db.raw("'person' as type"),
-          db.raw("COUNT(*) as cooccurrence_count"),
-          db.raw(`
+          )
+          .where("base_t.name", tagName)
+          .where("base_t.type", "person")
+          .where("t.type", "stage")
+          .whereNot("t.name", tagName)
+          .groupBy("t.name")
+          .orderBy("cooccurrence_count", "desc")
+          .limit(5);
+        const stageRecommendations = await buildQuery(
+          stageQuery,
+          baseConditions
+        );
+        recommendations = [
+          ...albumRecommendations,
+          ...stageRecommendations,
+          ...fallback,
+        ];
+      } else if (tagType === "stage") {
+        const personQuery = db("media_tags as mt_stage") // Start with stage tag occurrences
+          .join(
+            "media_tags as mt_person",
+            "mt_stage.media_id",
+            "mt_person.media_id"
+          )
+          .join("tags as t", "mt_person.tag_name", "t.name")
+          .join("media as m", "mt_person.media_id", "m.id")
+          .select(
+            "t.name as tag",
+            db.raw("'person' as type"),
+            db.raw("COUNT(*) as cooccurrence_count"),
+            db.raw(`
       (SELECT m2.thumbnail_path FROM media m2
        JOIN media_tags mt ON m2.id = mt.media_id
        WHERE mt.tag_name = t.name
        ORDER BY m2.created_at DESC LIMIT 1) as thumbnail_path
     `),
-          "t.is_protected",
-          "t.deleted_at",
-          "t.is_hidden"
-        )
-        .where("mt_stage.tag_name", tagName)
-        .where("t.type", "person")
-        .groupBy("t.name", "t.is_protected", "t.deleted_at", "t.is_hidden")
-        .orderBy("cooccurrence_count", "desc")
-        .limit(15);
-      console.log("personQuery", await personQuery);
-      const personRecommendations = await buildQuery(
-        personQuery,
-        baseConditions
-      );
+            "t.is_protected",
+            "t.deleted_at",
+            "t.is_hidden"
+          )
+          .where("mt_stage.tag_name", tagName)
+          .where("t.type", "person")
+          .groupBy("t.name", "t.is_protected", "t.deleted_at", "t.is_hidden")
+          .orderBy("cooccurrence_count", "desc")
+          .limit(15);
+        console.log("personQuery", await personQuery);
+        const personRecommendations = await buildQuery(
+          personQuery,
+          baseConditions
+        );
 
-      console.log("personRecommendations", personRecommendations);
+        console.log("personRecommendations", personRecommendations);
 
-      const albumQuery = db("tags as t")
-        .join("media_tags as mt", "t.name", "mt.tag_name")
-        .join("media as m", "mt.media_id", "m.id")
-        .select(
-          "t.name as tag",
-          db.raw("'album' as type"),
-          "m.thumbnail_path",
-          "m.file_path",
-          "m.thumbnail_md"
-        )
-        .where("t.type", "album")
-        .whereIn("mt.media_id", function () {
-          this.select("media_id").from("media_tags").where("tag_name", tagName);
-        })
-        .andWhere(
-          "m.id",
-          "=",
-          db("media as m2")
-            .select("m2.id")
-            .join("media_tags as mt2", "m2.id", "mt2.media_id")
-            .whereRaw("mt2.tag_name = t.name")
-            .orderBy("m2.id", "desc")
-            .limit(1)
-        )
-        .limit(8);
+        const albumQuery = db("tags as t")
+          .join("media_tags as mt", "t.name", "mt.tag_name")
+          .join("media as m", "mt.media_id", "m.id")
+          .select(
+            "t.name as tag",
+            db.raw("'album' as type"),
+            "m.thumbnail_path",
+            "m.file_path",
+            "m.thumbnail_md"
+          )
+          .where("t.type", "album")
+          .whereIn("mt.media_id", function () {
+            this.select("media_id")
+              .from("media_tags")
+              .where("tag_name", tagName);
+          })
+          .andWhere(
+            "m.id",
+            "=",
+            db("media as m2")
+              .select("m2.id")
+              .join("media_tags as mt2", "m2.id", "mt2.media_id")
+              .whereRaw("mt2.tag_name = t.name")
+              .orderBy("m2.id", "desc")
+              .limit(1)
+          )
+          .limit(8);
 
-      const albumRecommendations = await buildQuery(albumQuery, baseConditions);
+        const albumRecommendations = await buildQuery(
+          albumQuery,
+          baseConditions
+        );
 
-      recommendations = [
-        ...personRecommendations,
-        ...albumRecommendations,
-        ...fallback,
-      ];
-    } else {
-      recommendations = fallback;
-    }
-    const uniqueMap = new Map();
-
-    recommendations.forEach((item) => {
-      if (!uniqueMap.has(item.tag)) {
-        uniqueMap.set(item.tag, {
-          ...item,
-          id: item.tag,
-          name: item.tag,
-          last_media: `${SERVER_URL}:${SERVER_PORT}/file/${
-            item.thumbnail_path || item.thumbnail_md || item.file_path
-          }`,
-        });
+        recommendations = [
+          ...personRecommendations,
+          ...albumRecommendations,
+          ...fallback,
+        ];
+      } else {
+        recommendations = fallback;
       }
-    });
-    const uniqueRecommendations = Array.from(uniqueMap.values());
+      const uniqueMap = new Map();
 
-    res.status(200).json({
-      data: uniqueRecommendations,
-      count: uniqueRecommendations.length || 0,
-      message: "Recommendation success",
-    });
-  } catch (error) {
-    console.error("Error fetching recommendations:", error);
-    res.status(500).json({ error: "Failed to fetch recommendations" });
+      recommendations.forEach((item) => {
+        if (!uniqueMap.has(item.tag)) {
+          uniqueMap.set(item.tag, {
+            ...item,
+            id: item.tag,
+            name: item.tag,
+            last_media: `${SERVER_URL}:${SERVER_PORT}/file/${
+              item.thumbnail_path || item.thumbnail_md || item.file_path
+            }`,
+          });
+        }
+      });
+      const uniqueRecommendations = Array.from(uniqueMap.values());
+
+      res.status(200).json({
+        data: uniqueRecommendations,
+        count: uniqueRecommendations.length || 0,
+        message: "Recommendation success",
+      });
+    } catch (error) {
+      console.error("Error fetching recommendations:", error);
+      res.status(500).json({ error: "Failed to fetch recommendations" });
+    }
   }
-});
+);
 
 // GET route to check all tags and apply soft deletion if not used in media
 router.get("/check-tags", checkToken, async (req, res) => {
