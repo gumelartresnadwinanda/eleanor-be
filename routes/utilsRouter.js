@@ -6,7 +6,11 @@ const {
   findMissingThumbnails,
   findThumbnailsWithoutFile,
 } = require("../utils/thumbnail-finder");
-const { connectToRedis, isRedisAvailable } = require("../config/redis");
+const {
+  connectToRedis,
+  isRedisAvailable,
+  clearCache,
+} = require("../config/redis");
 
 const router = express.Router();
 
@@ -175,4 +179,14 @@ router.get("/reconnect-redis", async (req, res) => {
   }
 });
 
+router.delete("/clear-cache", async (req, res) => {
+  try {
+    await clearCache();
+    res.json({ message: "🧹 All Redis cache cleared." });
+  } catch (error) {
+    res
+      .status(500)
+      .json({ error: "Failed to clear cache", details: error.message });
+  }
+});
 module.exports = router;

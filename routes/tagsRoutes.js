@@ -256,11 +256,17 @@ router.get(
         { column: "tags.deleted_at", operator: "is", value: null },
         { column: "tags.is_hidden", operator: "=", value: false },
       ];
-      if (typeof is_protected !== "undefined") {
+      if (req.isAuthenticated && typeof is_protected !== "undefined") {
         fallbackConditions.push({
           column: "tags.is_protected",
           operator: "=",
-          value: !req.isAuthenticated ? false : is_protected,
+          value: is_protected,
+        });
+      } else if (typeof is_protected !== "undefined") {
+        fallbackConditions.push({
+          column: "tags.is_protected",
+          operator: "=",
+          value: false,
         });
       }
       const fallbackQuery = db("tags").select(
@@ -290,16 +296,20 @@ router.get(
         { column: "t.deleted_at", operator: "is", value: null },
         { column: "t.is_hidden", operator: "!=", value: true },
         { column: "t.name", operator: "!=", value: tagName },
-        ...(typeof is_protected !== "undefined"
-          ? [
-              {
-                column: "t.is_protected",
-                operator: "=",
-                value: !req.isAuthenticated ? false : is_protected,
-              },
-            ]
-          : []),
       ];
+      if (req.isAuthenticated && typeof is_protected !== "undefined") {
+        baseConditions.push({
+          column: "t.is_protected",
+          operator: "=",
+          value: is_protected,
+        });
+      } else if (typeof is_protected !== "undefined") {
+        baseConditions.push({
+          column: "t.is_protected",
+          operator: "=",
+          value: false,
+        });
+      }
 
       // Recommendations when the tag type is "album"
       if (tagType === "album") {

@@ -10,6 +10,7 @@ const connectToRedis = async () => {
     redisClient.on("error", (err) => {
       isRedisAvailable = false;
       redisClient.disconnect();
+      redisClient = null;
     });
 
     redisClient.on("connect", () => {
@@ -38,7 +39,7 @@ const connectToRedis = async () => {
 connectToRedis();
 module.exports = {
   getCache: async (key) => {
-    if (!isRedisAvailable) return null;
+    if (!isRedisAvailable || !redisClient) return null;
     try {
       console.log("getting cache:", key);
       return await redisClient.get(key);
@@ -48,12 +49,25 @@ module.exports = {
     }
   },
   setCache: async (key, value) => {
-    if (!isRedisAvailable) return;
+    console.log(isRedisAvailable, redisClient);
+    if (!isRedisAvailable || !redisClient) return;
     try {
       console.log("setting cache:", key);
       await redisClient.set(key, JSON.stringify(value));
     } catch (error) {
       console.warn("Error setting cache:", error);
+    }
+  },
+  clearCache: async () => {
+    if (!isRedisAvailable || !redisClient) {
+      console.warn("Redis not available. Cannot clear cache.");
+      return;
+    }
+    try {
+      await redisClient.flushAll();
+      console.log("All Redis cache cleared.");
+    } catch (error) {
+      console.warn("Error clearing Redis cache:", error);
     }
   },
   connectToRedis,
