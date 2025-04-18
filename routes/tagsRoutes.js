@@ -256,13 +256,14 @@ router.get(
         { column: "tags.deleted_at", operator: "is", value: null },
         { column: "tags.is_hidden", operator: "=", value: false },
       ];
-      if (req.isAuthenticated && typeof is_protected !== "undefined") {
-        fallbackConditions.push({
-          column: "tags.is_protected",
-          operator: "=",
-          value: is_protected,
-        });
-      } else if (typeof is_protected !== "undefined") {
+      if (req.isAuthenticated) {
+        if (typeof is_protected !== "undefined")
+          fallbackConditions.push({
+            column: "tags.is_protected",
+            operator: "=",
+            value: is_protected,
+          });
+      } else {
         fallbackConditions.push({
           column: "tags.is_protected",
           operator: "=",
@@ -297,13 +298,14 @@ router.get(
         { column: "t.is_hidden", operator: "!=", value: true },
         { column: "t.name", operator: "!=", value: tagName },
       ];
-      if (req.isAuthenticated && typeof is_protected !== "undefined") {
-        baseConditions.push({
-          column: "t.is_protected",
-          operator: "=",
-          value: is_protected,
-        });
-      } else if (typeof is_protected !== "undefined") {
+      if (req.isAuthenticated) {
+        if (typeof is_protected !== "undefined")
+          baseConditions.push({
+            column: "t.is_protected",
+            operator: "=",
+            value: is_protected,
+          });
+      } else {
         baseConditions.push({
           column: "t.is_protected",
           operator: "=",
