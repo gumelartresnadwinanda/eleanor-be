@@ -16,32 +16,23 @@ async function findMissingThumbnails(directoryPath, missingThumbnails = []) {
         [".jpg", ".jpeg", ".png", ".mp4", ".avi", ".mkv"].includes(ext)
       ) {
         const baseName = `thumb_${path.basename(filePath, ext)}`;
-        const thumbnailPaths = [
-          path.join(thumbnailDir, `${baseName}.jpg`),
-          path.join(thumbnailDir, `${baseName}_md.jpg`),
-          path.join(thumbnailDir, `${baseName}_lg.jpg`),
-        ];
+        const thumbnailPath = path.join(thumbnailDir, `${baseName}.jpg`);
 
-        const missing = [];
-        for (const thumbnailPath of thumbnailPaths) {
-          try {
-            await fs.access(thumbnailPath);
-          } catch (error) {
-            if (error.code === "ENOENT") {
-              missing.push(thumbnailPath);
-            } else {
-              console.error(
-                `Error checking thumbnail existence for file: ${filePath}`,
-                error
-              );
-            }
+        try {
+          await fs.access(thumbnailPath);
+          console.log(`Thumbnail exists for file: ${filePath}`);
+        } catch (error) {
+          if (error.code === "ENOENT") {
+            missingThumbnails.push({
+              file: filePath,
+              missing: [thumbnailPath],
+            });
+          } else {
+            console.error(
+              `Error checking thumbnail existence for file: ${filePath}`,
+              error
+            );
           }
-        }
-
-        if (missing.length > 0) {
-          missingThumbnails.push({ file: filePath, missing });
-        } else {
-          console.log(`All thumbnails exist for file: ${filePath}`);
         }
       }
     }
@@ -69,7 +60,7 @@ async function findThumbnailsWithoutFile(
       } else if (file.name.startsWith("thumb_") && [".jpg"].includes(ext)) {
         const originalFileName = file.name
           .replace(/^thumb_/, "")
-          .replace(/(_md|_lg)?\.jpg$/, "");
+          .replace(/\.jpg$/, "");
         const originalFilePath = path.join(
           path.dirname(directoryPath),
           originalFileName.replace(".JPG", "")

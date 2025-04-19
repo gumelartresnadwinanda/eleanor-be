@@ -55,11 +55,7 @@ async function populateTags(startId = 0) {
 }
 
 // Endpoint to trigger tag population
-router.post("/populate", checkToken, async (req, res) => {
-  if (!req.isAuthenticated) {
-    return res.status(403).json({ error: "Unauthorized" });
-  }
-
+router.post("/populate", async (req, res) => {
   const { startId = 0 } = req.body;
 
   try {
