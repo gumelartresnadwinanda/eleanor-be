@@ -70,10 +70,16 @@ router.post("/populate", async (req, res) => {
   }
 });
 
-function buildTagsQuery(isAuthenticated, is_protected, is_hidden, type) {
+function buildTagsQuery(
+  isAuthenticated,
+  is_protected,
+  is_hidden,
+  type,
+  isAdmin = false
+) {
   let query = db("tags");
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || !isAdmin) {
     query = query.where("is_protected", false);
   } else {
     if (is_protected !== undefined) {
@@ -104,13 +110,14 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
     popularity = false,
   } = req.query;
   const offset = (page - 1) * limit;
-
+  const isAdmin = req.user && req.user.role === "admin";
   try {
     let query = buildTagsQuery(
       req.isAuthenticated,
       is_protected,
       is_hidden,
-      type
+      type,
+      isAdmin || false
     ).whereNull("deleted_at");
 
     if (popularity === "true" || popularity === true) {
@@ -229,7 +236,7 @@ router.get(
   async (req, res) => {
     const { tagName } = req.params;
     const { is_protected } = req.query;
-
+    const isAdmin = req.user && req.user.role === "admin";
     try {
       const tagInfo = await db("tags").where("name", tagName).first();
       let recommendations = [];
@@ -252,7 +259,7 @@ router.get(
         { column: "tags.deleted_at", operator: "is", value: null },
         { column: "tags.is_hidden", operator: "=", value: false },
       ];
-      if (req.isAuthenticated) {
+      if (req.isAuthenticated && req.isAdmin) {
         if (typeof is_protected !== "undefined")
           fallbackConditions.push({
             column: "tags.is_protected",
@@ -294,7 +301,7 @@ router.get(
         { column: "t.is_hidden", operator: "!=", value: true },
         { column: "t.name", operator: "!=", value: tagName },
       ];
-      if (req.isAuthenticated) {
+      if (req.isAuthenticated && req.isAdmin) {
         if (typeof is_protected !== "undefined")
           baseConditions.push({
             column: "t.is_protected",

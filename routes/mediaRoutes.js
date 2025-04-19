@@ -25,10 +25,10 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       sort_order = "desc",
     } = req.query;
     const offset = (page - 1) * limit;
-
+    const isAdmin = req.user && req.user.role === "admin";
     // Build the query to fetch media
     let query = db("media").whereNull("deleted_at");
-    if (!req.isAuthenticated) {
+    if (!req.isAuthenticated || !isAdmin) {
       query = query.where("is_protected", false);
     } else {
       if (is_protected !== undefined) {
