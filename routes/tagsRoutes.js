@@ -259,7 +259,7 @@ router.get(
         { column: "tags.deleted_at", operator: "is", value: null },
         { column: "tags.is_hidden", operator: "=", value: false },
       ];
-      if (req.isAuthenticated && req.isAdmin) {
+      if (req.isAuthenticated && isAdmin) {
         if (typeof is_protected !== "undefined")
           fallbackConditions.push({
             column: "tags.is_protected",
@@ -301,7 +301,7 @@ router.get(
         { column: "t.is_hidden", operator: "!=", value: true },
         { column: "t.name", operator: "!=", value: tagName },
       ];
-      if (req.isAuthenticated && req.isAdmin) {
+      if (req.isAuthenticated && isAdmin) {
         if (typeof is_protected !== "undefined")
           baseConditions.push({
             column: "t.is_protected",
