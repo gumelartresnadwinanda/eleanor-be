@@ -177,6 +177,34 @@ async function processFile(filePath) {
         new Set([...directoryTags, ...(TAGS ? TAGS.split(",") : [])])
       ).join(",");
 
+      let createdAt;
+      try {
+        const now = new Date();
+        const dateMatch = filePath.match(/(\d{4})-(\d{2})-(\d{2})T/);
+
+        if (dateMatch) {
+          const parsedDate = new Date(
+            `${dateMatch[1]}-${dateMatch[2]}-${dateMatch[3]}`
+          );
+          createdAt =
+            parsedDate > now ? metadata.created_at || now : parsedDate;
+        } else {
+          const unixTimestampMatch = filePath.match(/(\d{10,13})/);
+          if (unixTimestampMatch) {
+            const timestamp = parseInt(unixTimestampMatch[1], 10);
+            const parsedDate = new Date(
+              timestamp.toString().length === 13 ? timestamp : timestamp * 1000
+            );
+            createdAt =
+              parsedDate > now ? metadata.created_at || now : parsedDate;
+          } else {
+            createdAt = metadata.created_at || now;
+          }
+        }
+      } catch (error) {
+        createdAt = metadata.created_at || new Date();
+      }
+
       const mediaEntry = {
         title: metadata.title,
         file_path: filePath,
@@ -186,7 +214,7 @@ async function processFile(filePath) {
         thumbnail_path: fs.existsSync(thumbnailPath) ? thumbnailPath : "",
         thumbnail_md: thumbnailMd,
         thumbnail_lg: thumbnailLg,
-        created_at: metadata.created_at || new Date(),
+        created_at: createdAt,
         is_protected: MEDIA_IS_PROTECTED || false,
       };
 

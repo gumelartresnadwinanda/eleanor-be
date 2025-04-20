@@ -61,7 +61,12 @@ async function processDirectory(directoryPath) {
       ) {
         await generateImageThumbnail(filePath, thumbnailPath);
         results.success.push(file);
-      } else if (ext === ".mp4" || ext === ".avi" || ext === ".mkv") {
+      } else if (
+        ext === ".mp4" ||
+        ext === ".avi" ||
+        ext === ".mkv" ||
+        ext === ".webm"
+      ) {
         await generateVideoThumbnail(filePath, thumbnailPath);
         results.success.push(file);
       } else {
