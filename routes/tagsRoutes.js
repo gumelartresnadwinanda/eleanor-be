@@ -193,7 +193,8 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       req.isAuthenticated,
       is_protected,
       is_hidden,
-      type
+      type,
+      isAdmin || false
     ).whereNull("deleted_at");
     const count = await countQuery.count("* as count").first();
 
