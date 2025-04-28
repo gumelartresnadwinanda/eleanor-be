@@ -86,9 +86,14 @@ async function optimizeVideo(filePath) {
     return new Promise((resolve, reject) => {
       ffmpeg(filePath)
         .outputOptions([
-          "-c:v libx264",
-          "-crf 28", // Adjust quality here (lower value means higher quality)
-          "-preset fast",
+          "-vf scale=1280:-2", // Resize width to 1280, keep aspect ratio
+          "-r 30", // Set frame rate to 30fps
+          "-c:v libx264", // Use H.264 codec
+          "-preset fast", // Fast encoding
+          "-crf 28", // Quality (lower = better quality)
+          "-c:a aac", // Use AAC audio (Android-friendly)
+          "-b:a 128k", // Audio bitrate
+          "-movflags +faststart", // Allow progressive playback
         ])
         .output(outputFilePath)
         .on("progress", (progress) => {
