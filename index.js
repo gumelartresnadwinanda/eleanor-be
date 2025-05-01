@@ -34,9 +34,6 @@ app.get("/", (req, res) => {
 const mediaRoutes = require("./routes/mediaRoutes");
 app.use("/medias", mediaRoutes);
 
-const playlistRoutes = require("./routes/playlistRoutes");
-app.use("/playlists", playlistRoutes);
-
 const tagsRoutes = require("./routes/tagsRoutes");
 app.use("/tags", tagsRoutes);
 

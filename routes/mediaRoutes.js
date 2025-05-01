@@ -100,4 +100,44 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
   }
 });
 
+// GET route to check all file paths and return missing files
+router.get("/check-files", checkToken, async (req, res) => {
+  const { deleteMissing = false } = req.query;
+
+  try {
+    const mediaFiles = await db("media")
+      .select("file_path")
+      .whereNull("deleted_at");
+    const missingFiles = [];
+
+    for (const media of mediaFiles) {
+      try {
+        await fs.access(media.file_path);
+      } catch (error) {
+        if (error.code === "ENOENT") {
+          missingFiles.push(media.file_path);
+          if (deleteMissing === "true") {
+            await db("media")
+              .where("file_path", media.file_path)
+              .update({ deleted_at: new Date() });
+            console.log(
+              `Soft deleted database entry for missing file: ${media.file_path}`
+            );
+          }
+        } else {
+          console.error(`Error checking file: ${media.file_path}`, error);
+        }
+      }
+    }
+
+    res.status(200).json({
+      message: "File check completed",
+      missingFiles,
+    });
+  } catch (error) {
+    console.error("Error checking files:", error);
+    res.status(500).json({ error: "Failed to check files" });
+  }
+});
+
 module.exports = router;
