@@ -516,13 +516,10 @@ router.get(
           .groupBy("t.name", "t.is_protected", "t.deleted_at", "t.is_hidden")
           .orderBy("cooccurrence_count", "desc")
           .limit(15);
-        console.log("personQuery", await personQuery);
         const personRecommendations = await buildQuery(
           personQuery,
           baseConditions
         );
-
-        console.log("personRecommendations", personRecommendations);
 
         const albumQuery = db("tags as t")
           .join("media_tags as mt", "t.name", "mt.tag_name")
