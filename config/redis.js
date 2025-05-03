@@ -49,7 +49,6 @@ module.exports = {
     }
   },
   setCache: async (key, value) => {
-    console.log(isRedisAvailable, redisClient);
     if (!isRedisAvailable || !redisClient) return;
     try {
       console.log("setting cache:", key);
