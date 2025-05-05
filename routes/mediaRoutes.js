@@ -186,4 +186,75 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.post("/favorite/:id", checkToken, async (req, res) => {
+  const { id } = req.params;
+  if (!req.user) {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    await db("favorites").insert({ user_id: req.user.id, media_id: id });
+    return res.json({ message: "added to favorite" });
+  } catch (err) {
+    console.error("error add to favorite:", err);
+    res.status(500).json({ message: err.detail || "Server error", error: err });
+  }
+});
+
+router.delete("/favorite/:id", checkToken, async (req, res) => {
+  const { id } = req.params;
+  if (!req.user) {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const deletedCount = await db("favorites")
+      .where({ user_id: req.user.id, id: id })
+      .del();
+
+    if (deletedCount === 0) {
+      return res.status(404).json({ message: "Favorite not found" });
+    }
+
+    return res.json({ message: "Favorite deleted" });
+  } catch (e) {
+    res.status(500).json({ message: e.detail || "Server Error", error: e });
+  }
+});
+
+router.get("/favorites/", checkToken, async (req, res) => {
+  const { is_protected } = req.query;
+  if (!req.user) {
+    res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    let query = db("favorites")
+      .select(
+        "favorites.id",
+        "media.thumbnail_md",
+        "media.thumbnail_path",
+        "media.file_path",
+        "media.tags",
+        "media.is_protected"
+      )
+      .join("media", "media.id", "favorites.media_id")
+      .where("favorites.user_id", req.user.id);
+
+    if (is_protected !== undefined) {
+      query = query.where("is_protected", is_protected);
+    }
+    const data = await query;
+    return res.json({
+      data,
+      count: data.length ?? 0,
+      message: "success fetch favorites",
+    });
+  } catch (e) {
+    res
+      .status(500)
+      .json({ message: e.detail || "Failed to fetch favorites", error: e });
+  }
+});
+
 module.exports = router;
