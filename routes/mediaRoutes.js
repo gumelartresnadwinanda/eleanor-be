@@ -140,4 +140,50 @@ router.get("/check-files", checkToken, async (req, res) => {
   }
 });
 
+router.delete("/:id", async (req, res) => {
+  const { id } = req.params;
+  const deleteWithData = req.query.deleteWithData === "true";
+
+  try {
+    const media = await db("media").where({ id }).first();
+
+    if (!media) {
+      return res.status(404).json({ message: "Media not found" });
+    }
+
+    if (deleteWithData) {
+      const filePaths = [
+        media.file_path,
+        media.thumbnail_path,
+        media.thumbnail_md,
+        media.thumbnail_lg,
+      ].filter(Boolean);
+
+      for (const file of filePaths) {
+        try {
+          await fs.unlink(file);
+        } catch (err) {
+          console.warn(`File not found or could not delete: ${file}`);
+        }
+      }
+
+      await db.transaction(async (trx) => {
+        await trx("media_tags").where({ media_id: id }).del();
+        await trx("media").where({ id }).del();
+      });
+
+      return res.json({ message: "Media and files deleted successfully" });
+    } else {
+      await db.transaction(async (trx) => {
+        await trx("media_tags").where({ media_id: id }).del();
+        await trx("media").where({ id }).update({ deleted_at: new Date() });
+      });
+      return res.json({ message: "Media soft deleted" });
+    }
+  } catch (err) {
+    console.error("Delete media error:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
