@@ -5,6 +5,7 @@ const ffmpeg = require("fluent-ffmpeg");
 const express = require("express");
 const { generateVideoThumbnail } = require("./thumbnail-generator");
 const { processFile } = require("./media-scanner");
+const { DEFAULT_SERVER } = require("../constants/default");
 
 const MEDIA_FOLDER = process.env.MEDIA_OPTIMIZE_FOLDER;
 
@@ -222,7 +223,7 @@ app.get("/status", (req, res) => {
 
 // Start the server and begin scanning and optimizing videos
 app.listen(port, () => {
-  console.log(`Server is running on http://localhost:${port}`);
+  console.log(`Server is running on ${DEFAULT_SERVER}:${port}`);
   console.log("--------------------------------------------------");
   scanAndOptimize();
 });

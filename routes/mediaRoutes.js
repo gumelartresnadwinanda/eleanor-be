@@ -2,16 +2,17 @@ require("dotenv").config();
 const express = require("express");
 const db = require("../db/connection");
 const checkToken = require("../middleware/authMiddleware");
-const mediaFields = require("../constants/mediaFields");
 const cacheMiddleware = require("../middleware/cacheMiddleware");
+const { DEFAULT_PORT, DEFAULT_SERVER } = require("../constants/default");
 const fs = require("fs").promises;
 
 const router = express.Router();
 
-const SERVER_PORT = process.env.SERVER_PORT || 5002;
-const SERVER_URL = process.env.SERVER_URL || "http://localhost";
+const SERVER_PORT = process.env.SERVER_PORT || DEFAULT_PORT;
+const SERVER_URL = process.env.SERVER_URL || DEFAULT_SERVER;
 
-// GET route to fetch media with pagination, randomization, authentication check, and optional tag search
+// TODO: handle to exclude some tags
+// TODO: simplify process
 router.get("/", checkToken, cacheMiddleware, async (req, res) => {
   try {
     const {
@@ -26,7 +27,7 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
     } = req.query;
     const offset = (page - 1) * limit;
     const isAdmin = req.user && req.user.role === "admin";
-    // Build the query to fetch media
+
     let query = db("media").whereNull("deleted_at");
     if (!req.isAuthenticated || !isAdmin) {
       query = query.where("is_protected", false);
@@ -61,22 +62,18 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       }
     }
 
-    // Add file_type filter
     if (file_type && file_type !== "all") {
       query = query.where("file_type", file_type);
     }
 
-    // Apply sorting, randomization, or pagination
     const countQuery = query.clone();
     query = query.orderBy(sort_by, sort_order).offset(offset).limit(limit);
 
-    // Execute the query and send the response
     const medias = await query;
     const count = await countQuery.count().first();
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
 
-    // Update file_path and thumbnail_path
     medias.forEach((media) => {
       if (media.server_location === "local") {
         if (media.file_path) {
@@ -100,7 +97,6 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
   }
 });
 
-// GET route to check all file paths and return missing files
 router.get("/check-files", checkToken, async (req, res) => {
   const { deleteMissing = false } = req.query;
 
@@ -256,5 +252,8 @@ router.get("/favorites/", checkToken, async (req, res) => {
       .json({ message: e.detail || "Failed to fetch favorites", error: e });
   }
 });
+
+// TODO: add route to handle changing tag of a media, reminder: also handle the normalization table
+// TODO: add rotue to handle protective field
 
 module.exports = router;

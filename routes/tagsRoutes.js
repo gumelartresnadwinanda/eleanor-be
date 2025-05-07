@@ -3,10 +3,11 @@ const express = require("express");
 const db = require("../db/connection");
 const checkToken = require("../middleware/authMiddleware");
 const cacheMiddleware = require("../middleware/cacheMiddleware");
+const { DEFAULT_PORT, DEFAULT_SERVER } = require("../constants/default");
 
 const router = express.Router();
-const SERVER_PORT = process.env.SERVER_PORT || 5002;
-const SERVER_URL = process.env.SERVER_URL || "http://localhost";
+const SERVER_PORT = process.env.SERVER_PORT || DEFAULT_PORT;
+const SERVER_URL = process.env.SERVER_URL || DEFAULT_SERVER;
 // Function to populate tags from media table
 async function populateTags(startId = 0) {
   try {
@@ -230,6 +231,7 @@ router.get("/detail/:tag", checkToken, cacheMiddleware, async (req, res) => {
   }
 });
 
+// TODO: Update Query for getting tag recommendation, update the table structure if needed
 router.get(
   "/recommendations/:tagName",
   cacheMiddleware,
