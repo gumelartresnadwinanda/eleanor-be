@@ -11,7 +11,24 @@ const router = express.Router();
 const SERVER_PORT = process.env.SERVER_PORT || DEFAULT_PORT;
 const SERVER_URL = process.env.SERVER_URL || DEFAULT_SERVER;
 
-// TODO: handle to exclude some tags
+function processTags(tagsStr, excludeTagsStr) {
+  const tags = tagsStr
+    .split(",")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
+  const excludeTags = excludeTagsStr
+    .split(",")
+    .map((tag) => tag.trim().toLowerCase())
+    .filter(Boolean);
+
+  const filteredTags = tags.filter((tag) => !excludeTags.includes(tag));
+
+  return {
+    filteredTags: filteredTags,
+    excludeTags: excludeTags,
+  };
+}
+
 // TODO: simplify process
 router.get("/", checkToken, cacheMiddleware, async (req, res) => {
   try {
@@ -19,14 +36,19 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       page = 1,
       limit = 10,
       tags,
-      match_all_tags = false,
       file_type,
       is_protected,
       sort_by = "created_at",
       sort_order = "desc",
+      tag_exclude,
     } = req.query;
     const offset = (page - 1) * limit;
     const isAdmin = req.user && req.user.role === "admin";
+
+    const { processedTags, processedExcludeTags } = processTags(
+      tags || "",
+      tag_exclude || ""
+    );
 
     let query = db("media").whereNull("deleted_at");
     if (!req.isAuthenticated || !isAdmin) {
@@ -37,29 +59,28 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       }
     }
 
-    if (tags) {
-      const tagsArray = tags.split(",").map((tag) => tag.toLowerCase());
-      if (match_all_tags === "true") {
-        query = query.where((builder) => {
-          tagsArray.forEach((tag) => {
-            builder
-              .andWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
-              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
-              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
-              .orWhere(db.raw("LOWER(tags)"), "=", tag);
-          });
+    if (finalInclude.length > 0) {
+      query = query.where((builder) => {
+        finalInclude.forEach((tag) => {
+          builder
+            .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
+            .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
+            .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
+            .orWhere(db.raw("LOWER(tags)"), "=", tag);
         });
-      } else {
-        query = query.where((builder) => {
-          tagsArray.forEach((tag) => {
-            builder
-              .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
-              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
-              .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
-              .orWhere(db.raw("LOWER(tags)"), "=", tag);
-          });
+      });
+    }
+
+    if (processedExcludeTags.length > 0) {
+      query = query.whereNot((builder) => {
+        processedExcludeTags.forEach((tag) => {
+          builder
+            .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
+            .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
+            .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag}`)
+            .orWhere(db.raw("LOWER(tags)"), "=", tag);
         });
-      }
+      });
     }
 
     if (file_type && file_type !== "all") {
