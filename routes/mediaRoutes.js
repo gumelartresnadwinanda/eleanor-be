@@ -45,7 +45,7 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
     const offset = (page - 1) * limit;
     const isAdmin = req.user && req.user.role === "admin";
 
-    const { processedTags, processedExcludeTags } = processTags(
+    const { filteredTags, excludeTags } = await processTags(
       tags || "",
       tag_exclude || ""
     );
@@ -59,9 +59,9 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       }
     }
 
-    if (finalInclude.length > 0) {
+    if (filteredTags?.length > 0) {
       query = query.where((builder) => {
-        finalInclude.forEach((tag) => {
+        filteredTags.forEach((tag) => {
           builder
             .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
             .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
@@ -71,9 +71,9 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       });
     }
 
-    if (processedExcludeTags.length > 0) {
+    if (excludeTags?.length > 0) {
       query = query.whereNot((builder) => {
-        processedExcludeTags.forEach((tag) => {
+        excludeTags.forEach((tag) => {
           builder
             .orWhere(db.raw("LOWER(tags)"), "like", `%${tag},%`)
             .orWhere(db.raw("LOWER(tags)"), "like", `%,${tag},%`)
@@ -114,6 +114,7 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
 
     res.json({ data: medias, next, prev, count: count.count });
   } catch (err) {
+    console.error("Error fetching media:", err);
     res.status(500).json({ error: "Failed to fetch media" });
   }
 });
