@@ -106,9 +106,10 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
     is_hidden = false,
     sort_by = "id",
     sort_order = "asc",
-    check_media = false,
+    check_media = false, // set to true to get the most recent media for each tag
     type,
-    popularity = false,
+    popularity = false, // show tags based on media count
+    tag_exclude = "",
   } = req.query;
   const offset = (page - 1) * limit;
   const isAdmin = req.user && req.user.role === "admin";
@@ -120,6 +121,37 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
       type,
       isAdmin || false
     ).whereNull("deleted_at");
+    let countQuery = buildTagsQuery(
+      req.isAuthenticated,
+      is_protected,
+      is_hidden,
+      type,
+      isAdmin || false
+    ).whereNull("deleted_at");
+
+    if (tag_exclude) {
+      const excludeTags = tag_exclude
+        .split(",")
+        .map((tag) => tag.trim().toLowerCase());
+      query = query.whereNot((builder) => {
+        excludeTags.forEach((tag) => {
+          builder
+            .orWhere(db.raw("LOWER(name)"), "like", `%${tag},%`)
+            .orWhere(db.raw("LOWER(name)"), "like", `%,${tag},%`)
+            .orWhere(db.raw("LOWER(name)"), "like", `%,${tag}`)
+            .orWhere(db.raw("LOWER(name)"), "=", tag);
+        });
+      });
+      countQuery = countQuery.whereNot((builder) => {
+        excludeTags.forEach((tag) => {
+          builder
+            .orWhere(db.raw("LOWER(name)"), "like", `%${tag},%`)
+            .orWhere(db.raw("LOWER(name)"), "like", `%,${tag},%`)
+            .orWhere(db.raw("LOWER(name)"), "like", `%,${tag}`)
+            .orWhere(db.raw("LOWER(name)"), "=", tag);
+        });
+      });
+    }
 
     if (popularity === "true" || popularity === true) {
       query = query
@@ -137,6 +169,7 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
     query = query.offset(offset).limit(limit);
 
     const tags = await query;
+    const count = await countQuery.count("* as count").first();
 
     if (check_media) {
       // Fetch the most recent media for each tag
@@ -189,15 +222,6 @@ router.get("/", checkToken, cacheMiddleware, async (req, res) => {
         }
       }
     }
-
-    const countQuery = buildTagsQuery(
-      req.isAuthenticated,
-      is_protected,
-      is_hidden,
-      type,
-      isAdmin || false
-    ).whereNull("deleted_at");
-    const count = await countQuery.count("* as count").first();
 
     const next = page * limit < count.count ? page + 1 : null;
     const prev = page > 1 ? page - 1 : null;
