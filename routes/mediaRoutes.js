@@ -275,6 +275,30 @@ router.get("/favorites/", checkToken, async (req, res) => {
   }
 });
 
+router.put("/tags/:id", checkToken, async (req, res) => {
+  const { id } = req.params;
+  const { tags } = req.body;
+
+  if (!req.user || !req.user.isAdmin) {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const media = await db("media").where({ id }).first();
+
+    if (!media) {
+      return res.status(404).json({ message: "Media not found" });
+    }
+
+    await db("media").where({ id }).update({ tags });
+
+    return res.json({ message: "Tags updated successfully" });
+  } catch (err) {
+    console.error("Error updating tags:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // TODO: add route to handle changing tag of a media, reminder: also handle the normalization table
 // TODO: add rotue to handle protective field
 
