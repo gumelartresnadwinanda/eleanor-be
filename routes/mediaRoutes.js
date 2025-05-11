@@ -279,7 +279,7 @@ router.put("/tags/:id", checkToken, async (req, res) => {
   const { id } = req.params;
   const { tags } = req.body;
 
-  if (!req.user || !req.user.isAdmin) {
+  if (!req.user || req.user.role !== "admin") {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
