@@ -299,7 +299,32 @@ router.put("/tags/:id", checkToken, async (req, res) => {
   }
 });
 
+router.put("/protect/:id", checkToken, async (req, res) => {
+  const { id } = req.params;
+  const { is_protected } = req.body;
+
+  if (!req.user || req.user.role !== "admin") {
+    return res.status(401).json({ message: "Unauthorized" });
+  }
+
+  try {
+    const media = await db("media").where({ id }).first();
+
+    if (!media) {
+      return res.status(404).json({ message: "Media not found" });
+    }
+
+    await db("media").where({ id }).update({ is_protected });
+
+    return res.json({
+      message: "Media protection status updated successfully",
+    });
+  } catch (err) {
+    console.error("Error updating protection status:", err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 // TODO: add route to handle changing tag of a media, reminder: also handle the normalization table
-// TODO: add rotue to handle protective field
 
 module.exports = router;
