@@ -292,6 +292,19 @@ router.put("/tags/:id", checkToken, async (req, res) => {
 
     await db("media").where({ id }).update({ tags });
 
+    await db("media_tags").where({ media_id: id }).del();
+    const tagsArray = tags.split(",").map((tag) => tag.trim());
+
+    await db("tags")
+      .insert(tagsArray.map((name) => ({ name })))
+      .onConflict("name")
+      .ignore();
+    const mediaTags = tagsArray.map((tag) => ({
+      media_id: id,
+      tag_name: tag,
+    }));
+    await db("media_tags").insert(mediaTags);
+
     return res.json({ message: "Tags updated successfully" });
   } catch (err) {
     console.error("Error updating tags:", err);
@@ -324,7 +337,5 @@ router.put("/protect/:id", checkToken, async (req, res) => {
     res.status(500).json({ message: "Server error" });
   }
 });
-
-// TODO: add route to handle changing tag of a media, reminder: also handle the normalization table
 
 module.exports = router;
