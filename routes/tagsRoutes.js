@@ -9,6 +9,7 @@ const router = express.Router();
 const SERVER_PORT = process.env.SERVER_PORT || DEFAULT_PORT;
 const SERVER_URL = process.env.SERVER_URL || DEFAULT_SERVER;
 // Function to populate tags from media table
+// TODO: handle adding media tags to the tags table so no need to look for media tags
 async function populateTags(startId = 0) {
   try {
     const mediaRecords = await db("media")
@@ -98,6 +99,7 @@ function buildTagsQuery(
   return query;
 }
 
+// TODO: Update query to handle filtering by media count per tag
 router.get("/", checkToken, cacheMiddleware, async (req, res) => {
   const {
     page = 1,

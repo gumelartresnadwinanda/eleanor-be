@@ -158,6 +158,7 @@ router.get("/check-files", checkToken, async (req, res) => {
   }
 });
 
+// TODO: Handle tags media tags on delete
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const deleteWithData = req.query.deleteWithData === "true";

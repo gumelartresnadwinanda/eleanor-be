@@ -126,6 +126,8 @@ async function optimizeVideo(filePath) {
           );
 
           // Generate thumbnail for the optimized video
+          // TODO: make this optional and configurable
+          // TODO: handle latest media tags in the media table
           try {
             console.log(
               `Generating thumbnail for optimized video: ${outputFilePath}`

@@ -132,6 +132,7 @@ function extractTagsFromPath(filePath) {
   return tagsFromPath;
 }
 
+// TODO: handle media tags in the tags table
 async function processFile(filePath) {
   const ext = path.extname(filePath).toLowerCase();
   if (SUPPORTED_EXTENSIONS.includes(ext)) {
