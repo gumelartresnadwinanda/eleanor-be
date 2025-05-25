@@ -33,23 +33,27 @@ async function populateTags(startId = 0) {
     const newTags = [...tagsSet].filter((tag) => !existingTagsMap.has(tag));
     let createdCount = 0;
     let restoredCount = 0;
+    const createdTags = [];
+    const restoredTags = [];
 
     for (const tag of newTags) {
       await db("tags").insert({ name: tag, is_protected: true });
       createdCount++;
+      createdTags.push(tag);
     }
 
     for (const tag of tagsSet) {
       if (existingTagsMap.has(tag) && existingTagsMap.get(tag) !== null) {
         await db("tags").where("name", tag).update({ deleted_at: null });
         restoredCount++;
+        restoredTags.push(tag);
       }
     }
 
     console.log(
       `Tags populated successfully. Created: ${createdCount}, Restored: ${restoredCount}`
     );
-    return { createdCount, restoredCount };
+    return { createdCount, restoredCount, createdTags, restoredTags };
   } catch (error) {
     console.error("Error populating tags:", error);
     throw error;
