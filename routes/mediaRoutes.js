@@ -291,7 +291,9 @@ router.put("/tags/:id", checkToken, async (req, res) => {
       return res.status(404).json({ message: "Media not found" });
     }
 
-    await db("media").where({ id }).update({ tags });
+    await db("media")
+      .where({ id })
+      .update({ tags: tags.replace(/\s+/g, "") });
 
     await db("media_tags").where({ media_id: id }).del();
     const tagsArray = tags.split(",").map((tag) => tag.trim());
