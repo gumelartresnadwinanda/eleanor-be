@@ -38,33 +38,6 @@ const SUPPORTED_EXTENSIONS = [
 
 module.exports = SUPPORTED_EXTENSIONS;
 
-// Ensure ffmpeg and ffprobe are installed and accessible
-ffmpeg.getAvailableFormats((err) => {
-  if (err) {
-    console.error("ffmpeg is not installed or not accessible in the PATH.");
-    process.exit(1);
-  }
-});
-
-ffmpeg.getAvailableCodecs((err) => {
-  if (err) {
-    console.error("ffprobe is not installed or not accessible in the PATH.");
-    process.exit(1);
-  }
-});
-
-// Handle ffmpeg process exit codes
-process.on("uncaughtException", (err) => {
-  if (err.code === "3221225725") {
-    console.error(
-      "ffmpeg exited with code 3221225725: Press [q] to stop, [?] for help"
-    );
-  } else {
-    console.error("Unhandled error:", err);
-  }
-  process.exit(1);
-});
-
 // Function to extract metadata from a file
 async function extractMetadata(filePath) {
   const ext = path.extname(filePath).toLowerCase();
