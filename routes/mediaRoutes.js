@@ -298,6 +298,7 @@ router.put("/tags/:id", checkToken, async (req, res) => {
     await db("media_tags").where({ media_id: id }).del();
     const tagsArray = tags.split(",").map((tag) => tag.trim());
 
+    // TODO: Check if media is_protected and handle tag creation accordingly
     await db("tags")
       .insert(tagsArray.map((name) => ({ name })))
       .onConflict("name")
