@@ -9,7 +9,6 @@ const router = express.Router();
 const SERVER_PORT = process.env.SERVER_PORT || DEFAULT_PORT;
 const SERVER_URL = process.env.SERVER_URL || DEFAULT_SERVER;
 // Function to populate tags from media table
-// TODO: handle adding media tags to the tags table so no need to look for media tags
 async function populateTags(startId = 0) {
   try {
     const mediaRecords = await db("media")
@@ -660,5 +659,6 @@ router.get("/check-tags", checkToken, async (req, res) => {
     res.status(500).json({ error: "Failed to check tags" });
   }
 });
+// TODO: add a route to calculate the media count for each tag, update the tags table with the media count, and handle insert and update operations, or schedule a job to update the media count periodically
 
 module.exports = router;
